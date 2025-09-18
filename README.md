@@ -60,8 +60,8 @@ O modelo de IA será treinado utilizando **bases de dados pré-existentes**, con
 ---
 
 ## 👥 Equipe  
-- 👨‍🏫 **Pesquisador responsável**: [Nome do Orientador]  
-- 👨‍💻 **Aluno de iniciação científica**: Luiz [Seu Sobrenome]  
-- 🏫 **Instituição**: [Nome da Universidade]  
+- 👨‍🏫 **Pesquisador responsável**: Rogério da Costa Gião  
+- 👨‍💻 **Aluno de iniciação científica**: Luiz Santana e Welber Willian da Silva  
+- 🏫 **Instituição**: UNIP - Universidade Paulista
 
 ---
