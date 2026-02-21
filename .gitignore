@@ -1,0 +1,72 @@
+# ==========================
+# Python cache
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==========================
+# Virtual environments
+# ==========================
+venv/
+env/
+ENV/
+.venv/
+
+# ==========================
+# Jupyter notebooks checkpoints
+# ==========================
+.ipynb_checkpoints/
+
+# ==========================
+# Model weights (YOLO / CNN)
+# ==========================
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# ==========================
+# Dataset folders
+# ==========================
+datasets/
+coco/
+data/
+
+# ==========================
+# Processed images / outputs
+# ==========================
+processed_images/
+unprocessed_images/
+yolo_output/
+*.jpg
+*.png
+
+# ==========================
+# Annotation files (optional – remove if you want them versioned)
+# ==========================
+*.json
+
+# ==========================
+# Logs
+# ==========================
+runs/
+logs/
+*.log
+
+# ==========================
+# OS generated files
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# IDE
+# ==========================
+.vscode/
+.idea/
+
+# ==========================
+# Environment variables
+# ==========================
+.env
