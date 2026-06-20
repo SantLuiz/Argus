@@ -30,6 +30,7 @@ pytest==8.3.4
 python-dateutil==2.9.0.post0
 python-multipart==0.0.20
 PyYAML==6.0.3
+qrcode[pil]==8.2
 requests==2.32.5
 scikit-image==0.26.0
 scipy==1.17.0
