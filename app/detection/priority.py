@@ -1,0 +1,60 @@
+LOW_PRIORITY_CLASSES = {
+    "backpack",
+    "handbag",
+    "suitcase",
+    "tie",
+    "umbrella",
+    "bottle",
+    "cup",
+    "cell phone",
+    "laptop",
+    "book",
+    "remote",
+    "mouse",
+    "keyboard",
+    "mochila",
+    "bolsa",
+    "mala",
+    "gravata",
+    "guarda chuva",
+    "garrafa",
+    "copo",
+    "celular",
+    "notebook",
+    "livro",
+    "controle remoto",
+    "teclado",
+}
+
+PERSON_CLASSES = {"person", "pessoa"}
+
+POINT_OF_INTEREST_CLASSES = {
+    "door",
+    "porta",
+    "doorway",
+    "passage",
+    "passagem",
+    "corridor",
+    "hallway",
+    "corredor",
+    "elevator",
+    "elevador",
+    "reception",
+    "recepcao",
+    "stairs",
+    "escada",
+    "step",
+    "degrau",
+    "ramp",
+    "rampa",
+    "handrail",
+    "corrimao",
+    "tactile paving",
+    "piso tatil",
+    "sign",
+    "sinalizacao",
+}
+
+
+def normalize_class_name(class_name: str) -> str:
+    return class_name.strip().lower().replace("_", " ")
