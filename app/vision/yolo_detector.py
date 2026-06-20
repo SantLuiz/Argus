@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import os
 from typing import Any
 
 import numpy as np
@@ -16,11 +17,13 @@ class YoloDetector:
 
     def __init__(
         self,
-        model_path: str = "yolov8n.pt",
+        model_path: str | None = None,
         confidence_threshold: float = 0.25,
         model_factory: Callable[[str], Any] | None = None,
     ) -> None:
-        self.model_path = model_path
+        # Classes de acessibilidade podem exigir um YOLO customizado treinado
+        # com dataset proprio/Roboflow. Ex.: ARGUS_YOLO_MODEL_PATH=models/best.pt
+        self.model_path = model_path or os.getenv("ARGUS_YOLO_MODEL_PATH", "yolov8n.pt")
         self.confidence_threshold = confidence_threshold
         self._model_factory = model_factory
         self._model: Any | None = None

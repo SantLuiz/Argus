@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.detection.priority import normalize_class_name
+from app.guidance.accessibility_rules import get_accessibility_class
 
 
 @dataclass(frozen=True)
@@ -87,4 +88,14 @@ DEFAULT_CLASS_INFO = ClassInfo("objeto", "objeto", "m", "contexto", 0)
 
 
 def map_class(class_name: str) -> ClassInfo:
+    accessibility_class = get_accessibility_class(class_name)
+    if accessibility_class is not None:
+        return ClassInfo(
+            canonical_name=accessibility_class.canonical_name,
+            label_pt=accessibility_class.label_pt,
+            gender=accessibility_class.gender,
+            semantic_group="acessibilidade",
+            base_score=accessibility_class.base_score,
+        )
+
     return CLASS_GROUPS.get(normalize_class_name(class_name), DEFAULT_CLASS_INFO)

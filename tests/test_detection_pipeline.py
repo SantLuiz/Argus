@@ -72,7 +72,7 @@ def test_detection_pipeline_integrates_detection_depth_position_and_message() ->
     assert result.detections[1].semantic_role == "obstaculo"
     assert result.navigation is not None
     assert result.navigation.target_class_name == "pessoa"
-    assert result.message.startswith("Pessoa a direita")
+    assert result.message.startswith("Pessoa à direita")
     assert result.audio.text == result.message
     assert result.processing_time_ms.depth_ms >= 0
 

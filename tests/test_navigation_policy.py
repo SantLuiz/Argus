@@ -53,7 +53,7 @@ def test_build_navigation_hint_uses_direction_and_relative_distance() -> None:
     assert hint.target_label_pt == "elevador"
     assert hint.direction == "esquerda"
     assert hint.proximity == "near"
-    assert "a esquerda" in hint.instruction
+    assert "à esquerda" in hint.instruction
 
 
 def test_isolated_low_priority_item_can_appear_with_low_priority() -> None:

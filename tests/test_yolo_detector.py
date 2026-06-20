@@ -56,3 +56,11 @@ def test_yolo_detector_accepts_opencv_image_and_standardizes_output() -> None:
     assert detections[0].class_name == "person"
     assert detections[0].confidence == 0.91
     assert detections[0].bbox == [10, 21, 100, 221]
+
+
+def test_yolo_detector_uses_custom_model_path_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("ARGUS_YOLO_MODEL_PATH", "models/best.pt")
+
+    detector = YoloDetector()
+
+    assert detector.model_path == "models/best.pt"

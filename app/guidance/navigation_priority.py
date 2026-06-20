@@ -24,7 +24,11 @@ class NavigationPriority:
         direction = _direction_text(target.zone)
         distance = _distance_text(target.depth.proximity)
 
-        if target.semantic_role in {"ponto_interesse", "acessibilidade"}:
+        if target.semantic_role == "acessibilidade" and target.class_name in {"piso tátil", "sinalização de acessibilidade"}:
+            instruction = f"{_capitalize(target.class_name)} identificado {direction}."
+        elif target.semantic_role == "acessibilidade":
+            instruction = f"{_capitalize(target.class_name)} {direction}."
+        elif target.semantic_role == "ponto_interesse":
             instruction = f"{_capitalize(target.class_name)} {direction}, {distance}."
         elif target.semantic_role == "obstaculo":
             instruction = f"{_capitalize(target.class_name)} {direction}, {distance}."
@@ -90,10 +94,10 @@ def _is_path_obstacle(detection: DetectionItem) -> bool:
 
 def _direction_text(zone: str) -> str:
     if zone == "esquerda":
-        return "a esquerda"
+        return "à esquerda"
     if zone == "direita":
-        return "a direita"
-    return "a frente"
+        return "à direita"
+    return "à frente"
 
 
 def _distance_text(proximity: str) -> str:

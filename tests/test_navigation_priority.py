@@ -39,7 +39,7 @@ def test_navigation_priority_favors_accessibility_element() -> None:
         ]
     )
 
-    assert prioritized[0].class_name == "rampa acessivel"
+    assert prioritized[0].class_name == "rampa acessível"
     assert prioritized[0].semantic_role == "acessibilidade"
 
 
@@ -64,7 +64,7 @@ def test_message_generator_outputs_short_navigation_message() -> None:
     detections = priority.prioritize([detection("stairs", zone="direita", proximity="near")])
     hint = priority.build_hint(detections)
 
-    assert generator.generate(detections, hint) == "Escada a direita, proximo."
+    assert generator.generate(detections, hint) == "Escada à direita."
 
 
 def test_message_generator_reports_clear_path_to_centered_door() -> None:
@@ -74,3 +74,50 @@ def test_message_generator_reports_clear_path_to_centered_door() -> None:
     hint = priority.build_hint(detections)
 
     assert generator.generate(detections, hint) == "Caminho livre em direcao a porta."
+
+
+def test_accessibility_mapping_generates_tactile_paving_message() -> None:
+    priority = NavigationPriority()
+    generator = MessageGenerator()
+    detections = priority.prioritize([detection("tactile_paving", zone="centro", proximity="medium")])
+    hint = priority.build_hint(detections)
+
+    assert detections[0].class_name == "piso tátil"
+    assert detections[0].semantic_role == "acessibilidade"
+    assert generator.generate(detections, hint) == "Piso tátil identificado à frente."
+
+
+def test_accessibility_mapping_generates_handrail_message() -> None:
+    priority = NavigationPriority()
+    generator = MessageGenerator()
+    detections = priority.prioritize([detection("handrail", zone="direita", proximity="far")])
+    hint = priority.build_hint(detections)
+
+    assert generator.generate(detections, hint) == "Corrimão à direita."
+
+
+def test_accessibility_mapping_generates_wheelchair_ramp_message() -> None:
+    priority = NavigationPriority()
+    generator = MessageGenerator()
+    detections = priority.prioritize([detection("wheelchair_ramp", zone="esquerda", proximity="medium")])
+    hint = priority.build_hint(detections)
+
+    assert generator.generate(detections, hint) == "Rampa acessível à esquerda."
+
+
+def test_accessibility_mapping_generates_elevator_message() -> None:
+    priority = NavigationPriority()
+    generator = MessageGenerator()
+    detections = priority.prioritize([detection("elevator", zone="centro", proximity="medium")])
+    hint = priority.build_hint(detections)
+
+    assert generator.generate(detections, hint) == "Elevador à frente."
+
+
+def test_no_accessibility_message_without_detection() -> None:
+    priority = NavigationPriority()
+    generator = MessageGenerator()
+    detections = priority.prioritize([])
+    hint = priority.build_hint(detections)
+
+    assert generator.generate(detections, hint) == "Nenhum ponto de interesse ou obstaculo relevante detectado."

@@ -15,7 +15,7 @@ class MessageGenerator:
         return navigation.instruction
 
     def _has_clear_path_to_interest(self, target: DetectionItem, detections: list[DetectionItem]) -> bool:
-        if target.semantic_role not in {"ponto_interesse", "acessibilidade"}:
+        if target.semantic_role != "ponto_interesse":
             return False
         if target.zone != "centro":
             return False
