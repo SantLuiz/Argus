@@ -56,7 +56,7 @@ class OpenVocabularyDetector:
     def detect(self, image: np.ndarray) -> list[ObjectDetection]:
         for provider, model_path in (("yoloe", self.primary_model_path), ("yolo_world", self.fallback_model_path)):
             try:
-                detections = self._detect_with_model(image, model_path)
+                detections = self._detect_with_model(image, model_path, provider)
                 self.last_provider = provider
                 self.last_error = None
                 return detections
@@ -65,7 +65,7 @@ class OpenVocabularyDetector:
 
         return []
 
-    def _detect_with_model(self, image: np.ndarray, model_path: str) -> list[ObjectDetection]:
+    def _detect_with_model(self, image: np.ndarray, model_path: str, provider: str) -> list[ObjectDetection]:
         model = self._load_model(model_path)
         if hasattr(model, "set_classes"):
             model.set_classes(self.classes)
@@ -73,7 +73,7 @@ class OpenVocabularyDetector:
         results = model.predict(source=image, conf=self.confidence_threshold, verbose=False)
         if not results:
             return []
-        return self._parse_result(results[0])
+        return self._parse_result(results[0], provider)
 
     def _load_model(self, model_path: str) -> Any:
         if model_path not in self._models:
@@ -81,7 +81,7 @@ class OpenVocabularyDetector:
             self._models[model_path] = factory(model_path)
         return self._models[model_path]
 
-    def _parse_result(self, result: Any) -> list[ObjectDetection]:
+    def _parse_result(self, result: Any, provider: str) -> list[ObjectDetection]:
         names = getattr(result, "names", {}) or {}
         boxes = getattr(result, "boxes", None)
         if boxes is None:
@@ -98,6 +98,8 @@ class OpenVocabularyDetector:
                     class_name=str(names.get(class_id, class_id)),
                     confidence=round(confidence, 4),
                     bbox=[int(round(value)) for value in _to_list(box.xyxy[0])],
+                    source_model=provider,
+                    detection_type="object_detection",
                 )
             )
         return detections

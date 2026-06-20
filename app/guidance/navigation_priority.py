@@ -78,8 +78,9 @@ class NavigationPriority:
             }
         )
 
-    def _sort_key(self, detection: DetectionItem) -> tuple[int, float, int, float]:
+    def _sort_key(self, detection: DetectionItem) -> tuple[int, int, float, int, float]:
         return (
+            0 if _is_safety_critical(detection) else 1,
             ROLE_ORDER.get(detection.semantic_role, 5),
             -detection.navigation_score,
             0 if detection.zone == "centro" else 1,
@@ -99,6 +100,12 @@ def _priority_from_score(score: float, role: str) -> str:
 
 def _is_path_obstacle(detection: DetectionItem) -> bool:
     return detection.zone == "centro" and detection.depth.proximity in {"very_near", "near"}
+
+
+def _is_safety_critical(detection: DetectionItem) -> bool:
+    if detection.zone != "centro" or detection.depth.proximity != "very_near":
+        return False
+    return detection.semantic_role in {"obstaculo", "pessoa"} or detection.class_name in {"escada", "degrau"}
 
 
 def _direction_text(zone: str) -> str:

@@ -77,6 +77,8 @@ class YoloDetector:
                     class_name=str(names.get(class_id, class_id)),
                     confidence=round(confidence, 4),
                     bbox=[int(round(value)) for value in _to_list(box.xyxy[0])],
+                    source_model="default_yolo",
+                    detection_type="object_detection",
                 )
             )
 

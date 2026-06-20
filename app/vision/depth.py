@@ -39,6 +39,9 @@ def combine_detections_with_depth(
                 zone=zone,
                 depth=depth,
                 priority=_priority_for(detection.class_name, zone, depth.proximity),
+                source_model=detection.source_model,
+                detection_type=detection.detection_type,
+                corroborated=detection.corroborated,
             )
         )
 

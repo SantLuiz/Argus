@@ -12,11 +12,11 @@ import requests
 
 API_URL = "http://127.0.0.1:8000/detect"
 OUTPUT_ROOT = Path("results") / "curl_runner"
-IMAGE_PATH = r"tests\img_exemplo\[IA]corredor_elevador.jpg"
+IMAGE_PATH = r"tests\img_exemplo\[REAL]corredor_piso_tátil.jpg"
 
 RUNS = 5
 WARMUP_RUNS = 1
-MODE = "exploration"
+IMAGE_PATH = r"tests\img_exemplo\[IA]corredor_elevador.jpg"
 TARGET_CLASS = "door"
 
 
@@ -25,24 +25,52 @@ class ModelBenchmarkConfig:
     name: str
     label: str
     use_open_vocab: bool = False
-    mode: str = MODE
+    mode: str = "auto"
     target_class: str | None = None
+    use_semantic_segmentation: bool = False
+    use_tactile_specialist: bool = False
+    use_classic_tactile: bool = False
+    use_ocr: bool = False
 
 
 MODEL_CONFIGS = [
+    ModelBenchmarkConfig(name="fast", label="Fast: YOLO padrao", mode="fast"),
     ModelBenchmarkConfig(
-        name="yolo_generic",
-        label="YOLO generico",
-        use_open_vocab=False,
-        mode=MODE,
-        target_class=TARGET_CLASS if MODE == "navigation" else None,
+        name="poi_open_vocab",
+        label="POI: YOLO + open-vocabulary",
+        mode="poi",
+        target_class=TARGET_CLASS,
+        use_open_vocab=True,
     ),
     ModelBenchmarkConfig(
-        name="yolo_open_vocab",
-        label="YOLO + open-vocabulary",
+        name="tactile",
+        label="Tactile: especialista + OpenCV",
+        mode="tactile",
         use_open_vocab=True,
-        mode=MODE,
-        target_class=TARGET_CLASS if MODE == "navigation" else None,
+        use_tactile_specialist=True,
+        use_classic_tactile=True,
+    ),
+    ModelBenchmarkConfig(name="auto", label="Auto: roteamento leve", mode="auto", target_class=TARGET_CLASS),
+    ModelBenchmarkConfig(
+        name="auto_ocr",
+        label="Auto + OCR opcional",
+        mode="auto",
+        target_class=TARGET_CLASS,
+        use_ocr=True,
+    ),
+    ModelBenchmarkConfig(
+        name="auto_segformer",
+        label="Auto + SegFormer opcional",
+        mode="auto",
+        target_class=TARGET_CLASS,
+        use_semantic_segmentation=True,
+    ),
+    ModelBenchmarkConfig(
+        name="navigation_target",
+        label="Navigation: alvo local",
+        mode="navigation",
+        target_class=TARGET_CLASS,
+        use_open_vocab=True,
     ),
 ]
 
@@ -66,7 +94,7 @@ def main() -> None:
 
     print(f"Imagem: {image_path}")
     print(f"Endpoint: {API_URL}")
-    print(f"Modo: {MODE}")
+    print(f"Alvo padrao: {TARGET_CLASS}")
     print(f"Warm-up por modelo: {WARMUP_RUNS} execucao(oes)")
     print(f"Benchmark por modelo: {RUNS} execucao(oes)")
     print(f"Saida: {run_root}\n")
@@ -132,6 +160,10 @@ def build_url(config: ModelBenchmarkConfig) -> str:
     query = {
         "mode": config.mode,
         "use_open_vocab": str(config.use_open_vocab).lower(),
+        "use_semantic_segmentation": str(config.use_semantic_segmentation).lower(),
+        "use_tactile_specialist": str(config.use_tactile_specialist).lower(),
+        "use_classic_tactile": str(config.use_classic_tactile).lower(),
+        "use_ocr": str(config.use_ocr).lower(),
     }
     if config.target_class:
         query["target_class"] = config.target_class
@@ -187,6 +219,10 @@ def build_benchmark_summary(config: ModelBenchmarkConfig, results: list[dict]) -
         "mode": config.mode,
         "target_class": config.target_class,
         "use_open_vocab": config.use_open_vocab,
+        "use_semantic_segmentation": config.use_semantic_segmentation,
+        "use_tactile_specialist": config.use_tactile_specialist,
+        "use_classic_tactile": config.use_classic_tactile,
+        "use_ocr": config.use_ocr,
         "runs": len(results),
         "avg_detection_ms": round(mean(detection_times), 2) if detection_times else 0,
         "avg_depth_ms": round(mean(depth_times), 2) if depth_times else 0,
@@ -243,7 +279,7 @@ def draw_detections(image_path: Path, detections: list[dict], config: ModelBench
 def draw_header(image: np.ndarray, config: ModelBenchmarkConfig, summary: dict) -> None:
     lines = [
         config.label,
-        f"modo={config.mode} | open_vocab={config.use_open_vocab}",
+        f"modo={config.mode} | open_vocab={config.use_open_vocab} | ocr={config.use_ocr}",
         f"total medio={summary['avg_total_ms']:.2f} ms | deteccoes={summary['avg_detections']:.2f}",
     ]
     font = cv2.FONT_HERSHEY_SIMPLEX

@@ -28,7 +28,7 @@ def test_prepare_navigation_detections_marks_accessories_as_low_priority() -> No
     assert prepared[2].semantic_role == "baixa_prioridade"
 
 
-def test_prepare_navigation_detections_prioritizes_points_of_interest() -> None:
+def test_prepare_navigation_detections_prioritizes_safety_over_points_of_interest() -> None:
     detections = [
         detection("person", [10, 10, 80, 200], zone="centro", proximity="very_near", confidence=0.95),
         detection("door", [200, 10, 280, 220], zone="direita", proximity="medium", confidence=0.70),
@@ -36,8 +36,8 @@ def test_prepare_navigation_detections_prioritizes_points_of_interest() -> None:
 
     prepared = prepare_navigation_detections(detections)
 
-    assert prepared[0].class_name == "porta"
-    assert prepared[0].semantic_role == "ponto_interesse"
+    assert prepared[0].class_name == "pessoa"
+    assert prepared[0].semantic_role == "pessoa"
     assert prepared[0].priority == "alta"
 
 

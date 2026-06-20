@@ -20,7 +20,18 @@ def test_health_check() -> None:
 
 
 class FakePipeline:
-    def analyze(self, image, image_name=None, mode="exploration", target_class=None, use_open_vocab=False):
+    def analyze(
+        self,
+        image,
+        image_name=None,
+        mode="exploration",
+        target_class=None,
+        use_open_vocab=False,
+        use_semantic_segmentation=False,
+        use_tactile_specialist=False,
+        use_classic_tactile=False,
+        use_ocr=False,
+    ):
         return DetectionResponse(
             detections=[
                 DetectionItem(
@@ -37,6 +48,13 @@ class FakePipeline:
             processing_time_ms=ProcessingTime(detection_ms=1, depth_ms=1, total_ms=2),
             mode=mode,
             use_open_vocab=use_open_vocab,
+            detection_plan={
+                "mode": mode,
+                "use_semantic_segmentation": use_semantic_segmentation,
+                "use_tactile_specialist": use_tactile_specialist,
+                "use_classic_tactile": use_classic_tactile,
+                "use_ocr": use_ocr,
+            },
             image_name=image_name,
             notes=["teste"],
         )
@@ -98,3 +116,24 @@ def test_detect_rejects_navigation_without_target(monkeypatch) -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_detect_accepts_routed_detection_query_params(monkeypatch) -> None:
+    monkeypatch.setattr(detect_route, "detection_pipeline", FakePipeline())
+    monkeypatch.setattr(detect_route, "load_image_cv2", lambda image_bytes: np.zeros((10, 10, 3), dtype=np.uint8))
+
+    image_buffer = BytesIO()
+    Image.new("RGB", (320, 240), color=(255, 255, 255)).save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+
+    response = client.post(
+        "/detect?mode=auto&use_semantic_segmentation=true&use_tactile_specialist=true&use_classic_tactile=true&use_ocr=true",
+        files={"image": ("teste.png", image_buffer, "image/png")},
+    )
+
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["mode"] == "auto"
+    assert data["detection_plan"]["use_semantic_segmentation"] is True
+    assert data["detection_plan"]["use_ocr"] is True

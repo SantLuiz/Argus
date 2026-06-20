@@ -14,7 +14,7 @@ def detection(class_name, zone="centro", proximity="medium", confidence=0.80):
     )
 
 
-def test_navigation_priority_favors_centered_point_of_interest_over_person() -> None:
+def test_navigation_priority_prioritizes_very_near_center_person_over_poi() -> None:
     priority = NavigationPriority()
 
     prioritized = priority.prioritize(
@@ -24,13 +24,13 @@ def test_navigation_priority_favors_centered_point_of_interest_over_person() -> 
         ]
     )
 
-    assert prioritized[0].class_name == "porta"
-    assert prioritized[0].semantic_role == "ponto_interesse"
+    assert prioritized[0].class_name == "pessoa"
+    assert prioritized[0].semantic_role == "pessoa"
     assert prioritized[0].priority == "alta"
-    assert prioritized[0].raw_class_name == "door"
-    assert prioritized[0].normalized_class == "porta"
-    assert prioritized[0].label_pt == "porta"
-    assert prioritized[0].category == "ponto_interesse"
+    assert prioritized[1].raw_class_name == "door"
+    assert prioritized[1].normalized_class == "porta"
+    assert prioritized[1].label_pt == "porta"
+    assert prioritized[1].category == "ponto_interesse"
     assert prioritized[0].priority_score > 0
 
 

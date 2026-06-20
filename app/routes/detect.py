@@ -17,9 +17,13 @@ async def detect_image(
     mode: str = Query(EXPLORATION_MODE),
     target_class: str | None = Query(None),
     use_open_vocab: bool = Query(False),
+    use_semantic_segmentation: bool = Query(False),
+    use_tactile_specialist: bool = Query(False),
+    use_classic_tactile: bool = Query(False),
+    use_ocr: bool = Query(False),
 ) -> DetectionResponse:
     if mode not in VALID_MODES:
-        raise HTTPException(status_code=400, detail="Modo invalido. Use exploration ou navigation.")
+        raise HTTPException(status_code=400, detail="Modo invalido. Use fast, poi, tactile, auto, exploration ou navigation.")
     if mode == NAVIGATION_MODE and not target_class:
         raise HTTPException(status_code=400, detail="Informe target_class no modo navigation.")
 
@@ -40,4 +44,8 @@ async def detect_image(
         mode=mode,
         target_class=target_class,
         use_open_vocab=use_open_vocab,
+        use_semantic_segmentation=use_semantic_segmentation,
+        use_tactile_specialist=use_tactile_specialist,
+        use_classic_tactile=use_classic_tactile,
+        use_ocr=use_ocr,
     )

@@ -11,6 +11,9 @@ class ObjectDetection(BaseModel):
     class_name: str
     confidence: float = Field(ge=0.0, le=1.0)
     bbox: list[int]
+    source_model: str = "unknown"
+    detection_type: str = "object_detection"
+    corroborated: bool = False
 
 
 class DetectionItem(BaseModel):
@@ -27,6 +30,9 @@ class DetectionItem(BaseModel):
     priority_score: float = 0.0
     semantic_role: str = "contexto"
     navigation_score: float = 0.0
+    source_model: str = "unknown"
+    detection_type: str = "object_detection"
+    corroborated: bool = False
 
 
 class NavigationHint(BaseModel):
@@ -61,6 +67,9 @@ class DetectionResponse(BaseModel):
     processing_time_ms: ProcessingTime
     mode: str = "exploration"
     use_open_vocab: bool = False
+    detection_plan: dict | None = None
+    generalist_findings: list[dict] = []
+    models_called: list[str] = []
     navigation: NavigationHint | None = None
     image_name: str | None = None
     notes: list[str] = []
