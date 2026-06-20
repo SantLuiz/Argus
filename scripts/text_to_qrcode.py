@@ -4,7 +4,18 @@ import argparse
 from pathlib import Path
 
 
-DEFAULT_TEXT = "ARGUS IC"
+DEFAULT_TEXT = """REFERÊNCIAS
+
+GONZALEZ, Rafael C.; WOODS, Richard E. Processamento digital de imagens. 3. ed. São Paulo: Pearson Prentice Hall, 2010.
+
+OPENCV. OpenCV: Open Source Computer Vision Library. Documentação oficial. Acesso em: 20 jun. 2026.
+
+ULTRALYTICS. Ultralytics YOLO Docs: object detection and computer vision models. Documentação oficial. Acesso em: 20 jun. 2026.
+
+RANFTL, René; BOCHKOVSKIY, Alexey; KOLTUN, Vladlen. Vision Transformers for Dense Prediction. Proceedings of the IEEE/CVF International Conference on Computer Vision, 2021.
+
+XIE, Enze et al. SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers. Advances in Neural Information Processing Systems, 2021.
+"""
 DEFAULT_OUTPUT = Path("results") / "qrcode.png"
 
 

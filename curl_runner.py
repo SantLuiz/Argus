@@ -12,12 +12,12 @@ import requests
 
 API_URL = "http://127.0.0.1:8000/detect"
 OUTPUT_ROOT = Path("results") / "curl_runner"
-IMAGE_PATH = r"tests\img_exemplo\[REAL]corredor_piso_tátil.jpg"
+IMAGE_PATH = r"tests\img_exemplo\[IA]corredor_obstaculos.jpg"
 
 RUNS = 5
 WARMUP_RUNS = 1
-IMAGE_PATH = r"tests\img_exemplo\[IA]corredor_elevador.jpg"
-TARGET_CLASS = "door"
+IMAGE_PATH = r"tests\img_exemplo\[IA]corredor_obstaculos.jpg"
+TARGET_CLASS = "objects"
 
 
 @dataclass(frozen=True)

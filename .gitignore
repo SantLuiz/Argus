@@ -1,72 +1,42 @@
-# ==========================
-# Python cache
-# ==========================
-__pycache__/
-*.py[cod]
-*$py.class
-
-# ==========================
-# Virtual environments
-# ==========================
+# Ambientes locais
+.venv/
 venv/
 env/
 ENV/
-.venv/
 
-# ==========================
-# Jupyter notebooks checkpoints
-# ==========================
-.ipynb_checkpoints/
+# Cache Python/testes
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
 
-# ==========================
-# Model weights (YOLO / CNN)
-# ==========================
-*.pt
-*.pth
-*.onnx
-*.engine
+# Configuracoes locais e IDE
+.env
+.codex/
+.agents/
+.vscode/
+.idea/
 
-# ==========================
-# Dataset folders
-# ==========================
-datasets/
-coco/
-data/
-
-# ==========================
-# Processed images / outputs
-# ==========================
-processed_images/
-unprocessed_images/
-yolo_output/
-*.jpg
-*.png
-
-# ==========================
-# Annotation files (optional – remove if you want them versioned)
-# ==========================
-*.json
-
-# ==========================
-# Logs
-# ==========================
+# Saidas geradas
+results/
 runs/
 logs/
 *.log
 
-# ==========================
-# OS generated files
-# ==========================
+# Pesos/modelos e artefatos grandes
+*.pt
+*.pth
+*.onnx
+*.engine
+models/*.pt
+models/*.pth
+models/*.onnx
+
+# Instaladores e arquivos temporarios locais
+*.exe
+mobileclip_blt.ts
+
+# Sistema operacional
 .DS_Store
 Thumbs.db
-
-# ==========================
-# IDE
-# ==========================
-.vscode/
-.idea/
-
-# ==========================
-# Environment variables
-# ==========================
-.env

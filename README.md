@@ -1,139 +1,73 @@
-#  Iniciação Científica  
-## Sistema integrado de visão computacional e inteligência artificial para descrição do ambiente e sugestão de rotas para pessoas cegas e com baixa visão  
+# Backend Python - ARGUS IC
 
----
+Backend inicial do ARGUS IC para demonstrar o fluxo:
 
-##  1. Descrição do Projeto  
-O objetivo principal deste projeto é o desenvolvimento de uma **aplicação móvel** destinada a **auxiliar pessoas cegas e com baixa visão na locomoção por ambientes**.  
+```text
+imagem -> deteccao -> profundidade monocular relativa -> mensagem -> audio no app
+```
 
-A solução proposta emprega **visão computacional** e **inteligência artificial (IA)** para:  
--  Identificar obstáculos presentes no caminho  
--  Interpretar comandos de voz  
--  Calcular trajetos mais seguros até um ponto de destino  
--  Responder de forma eficiente às solicitações dos usuários  
+Esta primeira versao usa servicos simulados e determinísticos para manter o prototipo simples. Os pontos de troca para modelos reais ficam em `app/vision/detection.py` e `app/vision/depth.py`.
 
-A proposta busca **proporcionar maior autonomia e segurança** para pessoas com deficiência visual, além de contribuir para a pesquisa em **acessibilidade** e **IA aplicada à inclusão social**.  
+## Como rodar
 
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
 
-###  Tecnologias e Metodologias  
--  **Visão Computacional** → identificação e segmentação de obstáculos no ambiente  
--  **Aprendizado de Máquina (ML)** → detecção de padrões e otimização da navegação  
--  **Processamento de Linguagem Natural (PLN)** → interpretação de comandos de voz e interação intuitiva  
+Endpoints:
 
-O modelo de IA será treinado utilizando **bases de dados pré-existentes**, contendo imagens anotadas e dados de profundidade, com foco em objetos e obstáculos comuns em ambientes **urbanos** e **internos**.  
+- `GET /health`
+- `POST /detect` com campo de arquivo `image`
 
-###  Validação e Testes  
--  **Cenários controlados** → ambientes simulados para validação inicial  
--  **Condições reais** → testes em ruas, calçadas, corredores e áreas internas  
--  **Feedback de usuários** → ajustes contínuos para acessibilidade  
+Exemplo com PowerShell:
 
-###  Impacto Esperado  
--  Maior **autonomia** e **segurança** para pessoas com deficiência visual  
--  Avanço das pesquisas em **visão computacional aplicada à acessibilidade**  
--  Contribuição para a **inclusão social** com soluções tecnológicas de impacto  
+```powershell
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:8000/detect" `
+  -Method Post `
+  -Form @{ image = Get-Item ".\imagem_teste.jpg" }
+```
 
-###  Equipe  
--  **Aluno de iniciação científica**: Luiz Santana e Welber Willian da Silva
--  **Professor Orientador**: Rogério da Costa Gião  
--  **Instituição**: UNIP - Universidade Paulista
+Exemplo com cURL:
 
----
+```bash
+curl -X POST "http://127.0.0.1:8000/detect" -F "image=@imagem_teste.jpg"
+```
 
-## 2. Objetivo do Módulo Atual
+## Teste local por script
 
-A etapa atualmente implementada tem como finalidade:
+```bash
+python scripts/test_detect_image.py caminho/para/imagem.jpg
+```
 
-- Capturar imagens do ambiente;
-- Realizar tratamento e padronização dos dados visuais;
-- Aplicar técnicas de detecção de objetos baseadas em redes neurais convolucionais;
-- Estruturar as informações detectadas em formato compatível com o padrão COCO;
-- Preparar os dados para futuras etapas de treinamento e inferência contextual.
+## Testes automatizados
 
-Esta fase constitui a base computacional necessária para a construção de um sistema de assistência ambiental em tempo real.
+```bash
+pytest
+```
 
----
+## Modelo customizado para acessibilidade
 
-## 3. Funcionalidades Implementadas
+O pipeline reconhece classes de acessibilidade como `tactile_paving`, `handrail`, `wheelchair_ramp`, `accessible_entrance`, `elevator`, `stairs` e `step` quando essas classes forem retornadas pelo modelo de deteccao.
 
-### 3.1 Processamento de Imagens
+O YOLO generico treinado em COCO provavelmente nao detecta esses elementos com boa precisao. Para esse caso, crie um dataset especifico, por exemplo no Roboflow, treine um modelo customizado e salve os pesos como:
 
-- Redimensionamento padronizado para entrada em redes neurais;
-- Conversão de espaço de cor (BGR → RGB);
-- Redução de ruído por filtro Gaussiano;
-- Realce de contraste por CLAHE;
-- Normalização de intensidade de pixels;
-- Estruturação para armazenamento reprodutível.
+```text
+models/best.pt
+```
 
-### 3.2 Detecção de Objetos com YOLOv8
+Para usar o modelo customizado:
 
-- Integração com modelo YOLOv8 (Ultralytics);
-- Detecção de pessoas, obstáculos urbanos, mobiliário e veículos;
-- Geração de *bounding boxes*;
-- Armazenamento de resultados em formato JSON compatível com COCO;
-- Salvamento de imagens anotadas para análise técnica.
+```bash
+set ARGUS_YOLO_MODEL_PATH=models/best.pt
+uvicorn app.main:app --reload
+```
 
-### 3.3 Estruturação para Aprendizado Supervisionado
+Mais detalhes em `docs/dataset_accessibilidade.md`.
 
-- Organização de imagens tratadas;
-- Geração de anotações estruturadas;
-- Conversão para tensores compatíveis com PyTorch;
-- Preparação do pipeline para futura etapa de treinamento de CNN customizada.
+## Observacao sobre profundidade
 
----
-
-## 4. Tecnologias Utilizadas
-
-- Python 3.10+
-- OpenCV
-- NumPy
-- scikit-image
-- PyTorch
-- Ultralytics YOLOv8
-- Estrutura de anotações padrão COCO
-
----
-
-## 6. Instalação e Execução
-
-### 6.1 Clonagem do Repositório
-
-- git clone https://github.com/SantLuiz/Argus.git
-- cd Argus
-- **Criação do Ambiente Virtual** python -m venv venv
-- **Ativação Windows** venv\Scripts\activate
-- **Ativação Linux/Mac** source venv/bin/activate
-- **Instalando dependências** pip install -r requirements.txt
-
----
-
-## 7. Procedimento de Uso (Fase Atual do Projeto)
-
-Nesta etapa de desenvolvimento, o sistema encontra-se focado no módulo de captação, tratamento e detecção de objetos em imagens estáticas. O fluxo operacional segue a sequência descrita abaixo.
-
----
-
-### 7.1 Preparação da Imagem de Entrada
-
-1. Inserir uma imagem de teste no diretório raiz do projeto.
-2. Recomenda-se utilizar imagens que representem cenários urbanos ou ambientes internos contendo possíveis obstáculos (ex.: pessoas, mobiliário, escadas, portas).
-
----
-
-### 7.2 Execução do Pipeline de Pré-Processamento
-
-O pré-processamento realiza:
-
-- Redimensionamento padronizado;
-- Conversão de espaço de cor;
-- Redução de ruído (filtro Gaussiano);
-- Realce de contraste (CLAHE);
-- Normalização de intensidade dos pixels.
-
-- **Execução processamento de imagem**  python preprocess.py
-- A imagem tratada será armazenada no diretório - processed_images/
-- **Execução Detecção de Objetos** python yolo_detection.py
-- **Imagem anotada com detecções** yolo_output/detected.jpg
-- **Arquivo JSON estruturado (formato COCO)** yolo_coco_annotations.json
-
-
-
+A profundidade retornada nesta base inicial e uma estimativa relativa simulada. Ela nao representa distancia em metros. A substituicao por MiDaS, Depth Anything ou outro modelo monocular deve preservar a mesma ideia de saida: valor relativo e categoria `near`, `medium` ou `far`.
