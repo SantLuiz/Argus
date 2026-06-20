@@ -193,3 +193,16 @@ def _label_pt(class_name: str) -> str:
 
 def _normalized_class(class_name: str) -> str:
     return normalize_class_name(class_name)
+
+
+from app.guidance.navigation_priority import NavigationPriority
+
+_navigation_priority = NavigationPriority()
+
+
+def prepare_navigation_detections(detections: list[DetectionItem]) -> list[DetectionItem]:
+    return _navigation_priority.prioritize(detections)
+
+
+def build_navigation_hint(detections: list[DetectionItem]) -> NavigationHint:
+    return _navigation_priority.build_hint(detections)

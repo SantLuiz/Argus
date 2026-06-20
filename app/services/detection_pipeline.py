@@ -5,7 +5,7 @@ import numpy as np
 
 from app.audio.speech_payload import build_audio_payload
 from app.detection.post_processor import DetectionPostProcessor
-from app.guidance.message_builder import build_guidance_message
+from app.guidance.message_generator import MessageGenerator
 from app.guidance.navigation_policy import build_navigation_hint, prepare_navigation_detections
 from app.schemas.detection import DetectionResponse, ObjectDetection, ProcessingTime
 from app.vision.depth import combine_detections_with_depth
@@ -35,10 +35,12 @@ class DetectionPipeline:
         detector: ObjectDetector | None = None,
         depth_estimator: DepthEstimator | None = None,
         post_processor: DetectionPostProcessor | None = None,
+        message_generator: MessageGenerator | None = None,
     ) -> None:
         self.detector = detector or YoloDetector()
         self.depth_estimator = depth_estimator or MidasEstimator()
         self.post_processor = post_processor or DetectionPostProcessor()
+        self.message_generator = message_generator or MessageGenerator()
 
     def analyze(self, image: np.ndarray, image_name: str | None = None) -> DetectionResponse:
         if not isinstance(image, np.ndarray):
@@ -72,7 +74,7 @@ class DetectionPipeline:
             depth_ms = 0
 
         navigation = build_navigation_hint(detections)
-        message = build_guidance_message(detections, navigation)
+        message = self.message_generator.generate(detections, navigation)
         audio = build_audio_payload(message)
 
         return DetectionResponse(
