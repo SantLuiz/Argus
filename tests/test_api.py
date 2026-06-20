@@ -20,7 +20,7 @@ def test_health_check() -> None:
 
 
 class FakePipeline:
-    def analyze(self, image, image_name=None):
+    def analyze(self, image, image_name=None, mode="exploration", target_class=None, use_open_vocab=False):
         return DetectionResponse(
             detections=[
                 DetectionItem(
@@ -35,6 +35,8 @@ class FakePipeline:
             message="Pessoa ao centro, proxima.",
             audio=AudioPayload(text="Pessoa ao centro, proxima."),
             processing_time_ms=ProcessingTime(detection_ms=1, depth_ms=1, total_ms=2),
+            mode=mode,
+            use_open_vocab=use_open_vocab,
             image_name=image_name,
             notes=["teste"],
         )
@@ -61,3 +63,38 @@ def test_detect_accepts_image_upload(monkeypatch) -> None:
     assert data["audio"]["language"] == "pt-BR"
     assert data["detections"][0]["depth"]["proximity"] == "near"
     assert data["image_name"] == "teste.png"
+
+
+def test_detect_accepts_navigation_query_params(monkeypatch) -> None:
+    monkeypatch.setattr(detect_route, "detection_pipeline", FakePipeline())
+    monkeypatch.setattr(detect_route, "load_image_cv2", lambda image_bytes: np.zeros((10, 10, 3), dtype=np.uint8))
+
+    image_buffer = BytesIO()
+    Image.new("RGB", (320, 240), color=(255, 255, 255)).save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+
+    response = client.post(
+        "/detect?mode=navigation&target_class=door&use_open_vocab=true",
+        files={"image": ("teste.png", image_buffer, "image/png")},
+    )
+
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["mode"] == "navigation"
+    assert data["use_open_vocab"] is True
+
+
+def test_detect_rejects_navigation_without_target(monkeypatch) -> None:
+    monkeypatch.setattr(detect_route, "detection_pipeline", FakePipeline())
+
+    image_buffer = BytesIO()
+    Image.new("RGB", (320, 240), color=(255, 255, 255)).save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+
+    response = client.post(
+        "/detect?mode=navigation",
+        files={"image": ("teste.png", image_buffer, "image/png")},
+    )
+
+    assert response.status_code == 400

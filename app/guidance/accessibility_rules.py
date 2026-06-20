@@ -16,6 +16,8 @@ class AccessibilityClass:
 ACCESSIBILITY_CLASSES: dict[str, AccessibilityClass] = {
     "ramp": AccessibilityClass("rampa", "rampa", "f", 98),
     "rampa": AccessibilityClass("rampa", "rampa", "f", 98),
+    "curb ramp": AccessibilityClass("rampa de acesso", "rampa de acesso", "f", 98),
+    "rampa de acesso": AccessibilityClass("rampa de acesso", "rampa de acesso", "f", 98),
     "handrail": AccessibilityClass("corrimao", "corrimão", "m", 92),
     "corrimao": AccessibilityClass("corrimao", "corrimão", "m", 92),
     "corrimão": AccessibilityClass("corrimao", "corrimão", "m", 92),
@@ -42,6 +44,27 @@ ACCESSIBILITY_CLASSES: dict[str, AccessibilityClass] = {
     "step": AccessibilityClass("degrau", "degrau", "m", 92),
     "degrau": AccessibilityClass("degrau", "degrau", "m", 92),
 }
+
+
+ACCESSIBILITY_CLASSES.update(
+    {
+        "tactile-paving": AccessibilityClass("piso tatil", "piso tátil", "m", 96),
+        "left turn tactile paving": AccessibilityClass(
+            "piso tatil direcional esquerda", "piso tátil direcional à esquerda", "m", 98
+        ),
+        "right turn tactile paving": AccessibilityClass(
+            "piso tatil direcional direita", "piso tátil direcional à direita", "m", 98
+        ),
+        "stop tactile paving": AccessibilityClass("piso tatil alerta", "piso tátil de alerta", "m", 100),
+        "straight tactile paving": AccessibilityClass("piso tatil direcional", "piso tátil direcional", "m", 98),
+        "disability sign": AccessibilityClass(
+            "sinalizacao de acessibilidade", "sinalização de acessibilidade", "f", 90
+        ),
+        "stair": AccessibilityClass("escada", "escada", "f", 96),
+        "downstair": AccessibilityClass("escada", "escada", "f", 96),
+        "upstair": AccessibilityClass("escada", "escada", "f", 96),
+    }
+)
 
 
 def get_accessibility_class(class_name: str) -> AccessibilityClass | None:

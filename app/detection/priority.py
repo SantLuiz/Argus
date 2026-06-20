@@ -57,4 +57,4 @@ POINT_OF_INTEREST_CLASSES = {
 
 
 def normalize_class_name(class_name: str) -> str:
-    return class_name.strip().lower().replace("_", " ")
+    return class_name.strip().lower().replace("_", " ").replace("-", " ")

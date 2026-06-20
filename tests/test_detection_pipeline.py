@@ -49,6 +49,14 @@ class BrokenDepthEstimator:
         raise RuntimeError("modelo indisponivel")
 
 
+class FakeOpenVocabularyDetector:
+    last_provider = "fake_open_vocab"
+    last_error = None
+
+    def detect(self, image):
+        return [ObjectDetection(class_name="door", confidence=0.88, bbox=[1, 1, 3, 3])]
+
+
 def test_detection_pipeline_integrates_detection_depth_position_and_message() -> None:
     image = np.zeros((4, 4, 3), dtype=np.uint8)
     pipeline = DetectionPipeline(
@@ -59,6 +67,8 @@ def test_detection_pipeline_integrates_detection_depth_position_and_message() ->
     result = pipeline.analyze(image, image_name="teste.jpg")
 
     assert result.image_name == "teste.jpg"
+    assert result.mode == "exploration"
+    assert result.use_open_vocab is False
     assert result.raw_detections is not None
     assert [item.class_name for item in result.raw_detections] == ["chair", "person"]
     assert len(result.detections) == 2
@@ -75,6 +85,39 @@ def test_detection_pipeline_integrates_detection_depth_position_and_message() ->
     assert result.message.startswith("Pessoa à direita")
     assert result.audio.text == result.message
     assert result.processing_time_ms.depth_ms >= 0
+
+
+def test_detection_pipeline_navigation_mode_guides_to_target() -> None:
+    image = np.zeros((4, 4, 3), dtype=np.uint8)
+    pipeline = DetectionPipeline(
+        detector=FakeOpenVocabularyDetector(),
+        depth_estimator=FakeDepthEstimator(),
+    )
+
+    result = pipeline.analyze(image, mode="navigation", target_class="door")
+
+    assert result.mode == "navigation"
+    assert result.navigation is not None
+    assert result.navigation.target_found is True
+    assert result.navigation.action == "forward"
+    assert result.message == "Porta a frente, siga em frente."
+
+
+def test_detection_pipeline_can_add_open_vocabulary_detections() -> None:
+    image = np.zeros((4, 4, 3), dtype=np.uint8)
+    pipeline = DetectionPipeline(
+        detector=EmptyDetector(),
+        depth_estimator=FakeDepthEstimator(),
+        open_vocab_detector=FakeOpenVocabularyDetector(),
+    )
+
+    result = pipeline.analyze(image, use_open_vocab=True)
+
+    assert result.use_open_vocab is True
+    assert result.raw_detections is not None
+    assert [item.class_name for item in result.raw_detections] == ["door"]
+    assert result.detections[0].class_name == "porta"
+    assert any("Open-vocabulary experimental ativado" in note for note in result.notes)
 
 
 def test_detection_pipeline_preserves_raw_detections_but_uses_filtered_output() -> None:

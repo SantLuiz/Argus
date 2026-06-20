@@ -27,6 +27,11 @@ def test_navigation_priority_favors_centered_point_of_interest_over_person() -> 
     assert prioritized[0].class_name == "porta"
     assert prioritized[0].semantic_role == "ponto_interesse"
     assert prioritized[0].priority == "alta"
+    assert prioritized[0].raw_class_name == "door"
+    assert prioritized[0].normalized_class == "porta"
+    assert prioritized[0].label_pt == "porta"
+    assert prioritized[0].category == "ponto_interesse"
+    assert prioritized[0].priority_score > 0
 
 
 def test_navigation_priority_favors_accessibility_element() -> None:

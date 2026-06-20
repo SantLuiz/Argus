@@ -1,0 +1,10 @@
+EXPLORATION_MODE = "exploration"
+NAVIGATION_MODE = "navigation"
+VALID_MODES = {EXPLORATION_MODE, NAVIGATION_MODE}
+
+ACTION_FORWARD = "forward"
+ACTION_SEARCH = "search"
+ACTION_SLIGHT_LEFT = "slight_left"
+ACTION_SLIGHT_RIGHT = "slight_right"
+ACTION_STOP = "stop"
+

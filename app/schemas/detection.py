@@ -20,6 +20,11 @@ class DetectionItem(BaseModel):
     zone: str
     depth: DepthInfo
     priority: str
+    raw_class_name: str | None = None
+    normalized_class: str | None = None
+    label_pt: str | None = None
+    category: str | None = None
+    priority_score: float = 0.0
     semantic_role: str = "contexto"
     navigation_score: float = 0.0
 
@@ -27,8 +32,12 @@ class DetectionItem(BaseModel):
 class NavigationHint(BaseModel):
     target_class_name: str | None = None
     target_label_pt: str | None = None
+    target_class: str | None = None
+    target_found: bool = False
     direction: str | None = None
+    action: str | None = None
     proximity: str | None = None
+    distance_label: str | None = None
     instruction: str
 
 
@@ -50,6 +59,8 @@ class DetectionResponse(BaseModel):
     message: str
     audio: AudioPayload
     processing_time_ms: ProcessingTime
+    mode: str = "exploration"
+    use_open_vocab: bool = False
     navigation: NavigationHint | None = None
     image_name: str | None = None
     notes: list[str] = []

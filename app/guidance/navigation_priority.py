@@ -40,8 +40,12 @@ class NavigationPriority:
         return NavigationHint(
             target_class_name=target.class_name,
             target_label_pt=target.class_name,
+            target_class=target.normalized_class or target.class_name,
+            target_found=True,
             direction=target.zone,
+            action=_action_from_zone(target.zone),
             proximity=target.depth.proximity,
+            distance_label=target.depth.label_pt,
             instruction=instruction,
         )
 
@@ -63,6 +67,11 @@ class NavigationPriority:
         return detection.model_copy(
             update={
                 "class_name": class_name,
+                "raw_class_name": detection.raw_class_name or detection.class_name,
+                "normalized_class": class_info.canonical_name,
+                "label_pt": class_info.label_pt,
+                "category": role,
+                "priority_score": round(score, 3),
                 "semantic_role": role,
                 "navigation_score": round(score, 3),
                 "priority": _priority_from_score(score, role),
@@ -109,6 +118,14 @@ def _distance_text(proximity: str) -> str:
         "unknown": "distancia nao estimada",
     }
     return labels.get(proximity, "distancia aproximada")
+
+
+def _action_from_zone(zone: str) -> str:
+    if zone == "esquerda":
+        return "slight_left"
+    if zone == "direita":
+        return "slight_right"
+    return "forward"
 
 
 def _capitalize(text: str) -> str:
