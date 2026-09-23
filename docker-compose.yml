@@ -1,0 +1,12 @@
+services:
+  argus-backend:
+    build: .
+    environment:
+      ARGUS_MVP_PROFILE: "true"
+      ARGUS_MAX_UPLOAD_BYTES: "5242880"
+      ARGUS_MAX_DECODED_PIXELS: "12000000"
+      ARGUS_BACKEND_HOST: "${ARGUS_BACKEND_HOST:?configure ARGUS_BACKEND_HOST}"
+      ARGUS_BACKEND_PORT: "${ARGUS_BACKEND_PORT:?configure ARGUS_BACKEND_PORT}"
+    ports:
+      - "${ARGUS_PUBLISHED_HOST:?configure ARGUS_PUBLISHED_HOST}:${ARGUS_PUBLISHED_PORT:?configure ARGUS_PUBLISHED_PORT}:${ARGUS_BACKEND_PORT:?configure ARGUS_BACKEND_PORT}"
+    restart: unless-stopped

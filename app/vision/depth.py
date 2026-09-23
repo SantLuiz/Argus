@@ -1,5 +1,4 @@
 import numpy as np
-from PIL import Image
 
 from app.schemas.detection import DepthInfo, DetectionItem, ObjectDetection
 
@@ -7,6 +6,7 @@ from app.schemas.detection import DepthInfo, DetectionItem, ObjectDetection
 def combine_detections_with_depth(
     detections: list[ObjectDetection],
     depth_map: np.ndarray,
+    depth_source: str = "midas",
 ) -> list[DetectionItem]:
     """Associa cada bbox YOLO a uma profundidade relativa.
 
@@ -24,11 +24,11 @@ def combine_detections_with_depth(
     for detection in detections:
         x1, y1, x2, y2 = _clip_bbox(detection.bbox, width, height)
         if x2 <= x1 or y2 <= y1:
-            depth = DepthInfo(relative_value=0.0, proximity="unknown", label_pt="nao estimado")
+            depth = DepthInfo(relative_value=0.0, proximity="unknown", label_pt="nao estimado", source=depth_source)
         else:
             bbox_depth = depth_map[y1:y2, x1:x2]
             relative_value = float(np.median(bbox_depth))
-            depth = _depth_info_from_relative(relative_value)
+            depth = _depth_info_from_relative(relative_value, source=depth_source)
 
         zone = _horizontal_zone(x1, x2, width)
         combined.append(
@@ -48,45 +48,15 @@ def combine_detections_with_depth(
     return combined
 
 
-class PlaceholderDepthEstimator:
-    """Estimador relativo temporario.
-
-    A regra aproxima objetos mais baixos na imagem como mais proximos. Ela existe
-    apenas para exercitar o fluxo ate a entrada de um modelo monocular real.
-    """
-
-    def attach_depth(self, image: Image.Image, detections: list[DetectionItem]) -> list[DetectionItem]:
-        _, height = image.size
-        updated: list[DetectionItem] = []
-
-        for detection in detections:
-            _, y1, _, y2 = detection.bbox
-            center_y = (y1 + y2) / 2
-            relative_value = min(max(center_y / max(height, 1), 0.0), 1.0)
-            depth = _depth_info_from_relative(relative_value)
-            priority = _priority_for(detection.class_name, detection.zone, depth.proximity)
-
-            updated.append(
-                detection.model_copy(
-                    update={
-                        "depth": depth,
-                        "priority": priority,
-                    }
-                )
-            )
-
-        return updated
-
-
-def _depth_info_from_relative(value: float) -> DepthInfo:
+def _depth_info_from_relative(value: float, source: str = "unknown") -> DepthInfo:
     value = min(max(value, 0.0), 1.0)
     if value >= 0.85:
-        return DepthInfo(relative_value=round(value, 3), proximity="very_near", label_pt="muito proximo")
+        return DepthInfo(relative_value=round(value, 3), proximity="very_near", label_pt="muito proximo", source=source)
     if value >= 0.60:
-        return DepthInfo(relative_value=round(value, 3), proximity="near", label_pt="proximo")
+        return DepthInfo(relative_value=round(value, 3), proximity="near", label_pt="proximo", source=source)
     if value >= 0.35:
-        return DepthInfo(relative_value=round(value, 3), proximity="medium", label_pt="medio")
-    return DepthInfo(relative_value=round(value, 3), proximity="far", label_pt="distante")
+        return DepthInfo(relative_value=round(value, 3), proximity="medium", label_pt="medio", source=source)
+    return DepthInfo(relative_value=round(value, 3), proximity="far", label_pt="distante", source=source)
 
 
 def _priority_for(class_name: str, zone: str, proximity: str) -> str:

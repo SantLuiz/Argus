@@ -23,6 +23,7 @@ def test_combine_detections_with_depth_uses_bbox_median_and_labels_proximity() -
     combined = combine_detections_with_depth(detections, depth_map)
 
     assert combined[0].depth.proximity == "near"
+    assert combined[0].depth.source == "midas"
     assert combined[0].depth.label_pt == "proximo"
     assert combined[0].zone == "direita"
     assert combined[1].depth.proximity == "far"
@@ -41,3 +42,4 @@ def test_combine_detections_with_depth_clips_bbox_to_depth_map() -> None:
 
     assert combined[0].bbox == [0, 0, 10, 10]
     assert combined[0].depth.proximity == "medium"
+    assert combined[0].depth.source == "midas"

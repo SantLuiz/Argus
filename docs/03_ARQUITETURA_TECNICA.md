@@ -1,4 +1,6 @@
-# 03 - Arquitetura técnica recomendada
+# 03 - Arquitetura técnica da IC
+
+> Este documento registra os fundamentos arquiteturais. Para a implementação atual, leia [CODEBASE.md](CODEBASE.md); sugestões abaixo não significam funcionalidades entregues.
 
 ## Visão geral
 
@@ -189,34 +191,11 @@ Durante a IC, o backend pode rodar localmente. Para demonstração remota, usar:
 - GitHub para versionamento;
 - Google Colab para treinamento e experimentos com modelos.
 
-## Organização sugerida do repositório
+## Organização atual do repositório
 
-```text
-argus-ic/
-├── AGENTS.md
-├── README.md
-├── app_flutter/
-│   └── ...
-├── backend_python/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── vision/
-│   │   └── schemas/
-│   ├── models/
-│   ├── tests/
-│   ├── requirements.txt
-│   └── Dockerfile
-├── notebooks/
-│   └── treinamento_colab.ipynb
-├── datasets/
-│   └── README.md
-├── docs/
-│   └── ...
-└── results/
-    └── README.md
-```
+O backend está em `app/`, na raiz, com testes em `tests/`, dependências em `requirements.txt` e ferramentas em `scripts/`. O aplicativo único está em `app_flutter/`. Pesos locais ficam em `models/`, resultados em `results/` e documentação em `docs/`.
+
+A antiga árvore proposta com `backend_python/` não foi adotada. Use [CODEBASE.md](CODEBASE.md) para arquivos, funções e fluxo atual; [README_TECNICO.md](README_TECNICO.md) para o contrato HTTP. Exemplos conceituais deste documento não substituem os schemas implementados.
 
 ## Regra de simplicidade
 

@@ -1,72 +1,55 @@
-# README tecnico - ARGUS IC
+# Backend: API, modelos e configuração
 
-## Elementos de acessibilidade e modelo customizado
+## Contrato HTTP
 
-O backend possui suporte semantico para classes de acessibilidade quando elas forem retornadas pelo modelo de deteccao:
+A API FastAPI é criada em `app/main.py`. Com o servidor ativo, `/docs` exibe o contrato OpenAPI da implementação.
 
-- `ramp` -> rampa
-- `handrail` -> corrimao
-- `tactile_paving` -> piso tatil
-- `accessibility_sign` -> sinalizacao de acessibilidade
-- `wheelchair_ramp` -> rampa acessivel
-- `accessible_entrance` -> entrada acessivel
-- `elevator` -> elevador
-- `stairs` -> escada
-- `step` -> degrau
+| Endpoint | Comportamento |
+|---|---|
+| `GET /health` | Processo vivo: `status=ok`, `project=ARGUS IC` |
+| `GET /ready` | Informa `ready`, `busy`, perfil e modelos carregados sob demanda |
+| `POST /detect` | Recebe multipart no campo `image`; retorna detecções e mensagem para TTS |
 
-O YOLO generico treinado em COCO provavelmente nao detecta esses elementos com boa precisao. Para reconhecer esses recursos em ambientes internos, recomenda-se criar um dataset especifico, anotado manualmente ou com apoio do Roboflow.
+`/ready` não executa inferência: `ready=true` não comprova que pesos foram baixados ou que MiDaS funciona. A rota usa um lock por processo para uma análise por vez; rode um worker no protótipo.
 
-Fluxo recomendado:
+O upload aceita JPEG, PNG e WebP. Limites padrão: 5 MiB compactados e 12 milhões de pixels decodificados. `mode` aceita `fast`, `poi`, `tactile`, `auto`, `exploration` e `navigation`. O aplicativo usa `exploration` ou `navigation&target_class=door`.
 
-1. Coletar imagens internas com recursos de acessibilidade.
-2. Anotar as classes de interesse.
-3. Treinar um YOLO leve no Google Colab.
-4. Exportar o melhor peso como `models/best.pt`.
-5. Rodar o backend com `ARGUS_YOLO_MODEL_PATH=models/best.pt`.
+Parâmetros experimentais: `use_open_vocab`, `use_semantic_segmentation`, `use_tactile_specialist`, `use_classic_tactile`, `use_ocr`. O roteador decide os modelos finais; consulte `detection_plan`, `models_called` e `notes` na resposta em vez de presumir que todas as flags executarão um especialista.
 
-Mais detalhes estao em `docs/dataset_accessibilidade.md`.
+`DetectionResponse`, em `app/schemas/detection.py`, contém as detecções, caixas, zonas, profundidade, mensagem, `audio`, navegação, tempos e rastreabilidade dos modelos. O backend devolve **texto e metadados** para síntese; o som é produzido no Flutter.
 
-## Modos do endpoint `/detect`
+Erros de validação usam HTTP 400/413; backend ocupado retorna 429 com `Retry-After`. Falhas operacionais como `DEPTH_UNAVAILABLE` e `TARGET_DETECTOR_UNAVAILABLE` usam 503. A forma estruturada é `detail: {code, message}`; nem todas as exceções genéricas seguem essa forma. Não apresentar indisponibilidade do modelo como ausência de obstáculos.
 
-O endpoint aceita dois modos:
+## Perfil de demonstração
 
-- `mode=exploration`: modo padrao. Resume pontos de interesse, acessibilidade e obstaculos relevantes no frame atual.
-- `mode=navigation&target_class=door`: orientacao local simples ate um alvo visivel, como `door`, `elevator` ou `reception`.
+Use `ARGUS_MVP_PROFILE=true`, como faz o script de execução. Navegação é restrita a porta; o plano final reduz especialistas opcionais e a profundidade real é obrigatória quando há detecções. O plano inicial/análise generalista ainda ocorre antes da restrição final; não afirmar ausência absoluta de trabalho extra apenas por ativar o perfil.
 
-Exemplos:
+Se não houver detecções, MiDaS não é executado e `depth_source=not_run`. Se houver detecções e MiDaS falhar, o MVP responde com erro. Fora do perfil, o pipeline pode usar `depth_source=fallback` e registrar a limitação em `notes`; esse resultado não valida profundidade monocular real.
 
-```bash
-curl -X POST "http://127.0.0.1:8000/detect?mode=exploration" -F "image=@tests/img_exemplo/[IA]corredor_elevador.jpg"
-curl -X POST "http://127.0.0.1:8000/detect?mode=navigation&target_class=door" -F "image=@tests/img_exemplo/[IA]corredor_elevador.jpg"
-```
+## Modelos
 
-O modo de navegacao nao implementa SLAM, mapa 3D ou rota global. Ele apenas usa a deteccao do frame atual, posicao horizontal e profundidade monocular relativa para sugerir uma direcao curta.
+- `YoloDetector`: objetos gerais; pesos indicados por `ARGUS_YOLO_MODEL_PATH`.
+- `OpenVocabularyDetector`: YOLOE com alternativa YOLO-World; caminhos em `ARGUS_YOLOE_MODEL_PATH` e `ARGUS_YOLO_WORLD_MODEL_PATH`.
+- `MidasEstimator`: `MiDaS_small` via Torch Hub, carregado na primeira inferência. Pode precisar de acesso à rede/cache.
+- Especialistas de piso tátil, OCR, segmentação e heurísticas: experimentais, preservados para comparação científica.
 
-## Detector open-vocabulary experimental
+Coloque pesos customizados em `models/` e aponte a variável correspondente. Não inclua pesos no Git. O detector COCO genérico não garante classes como portas ou piso tátil; veja [datasets](dataset_accessibilidade.md) e [roteamento](routed_detection_architecture.md).
 
-O backend tambem aceita `use_open_vocab=true` para complementar o YOLO atual com um detector de vocabulario aberto. A prioridade esperada e YOLOE, com fallback para YOLO-World quando disponivel no ambiente.
+A profundidade é normalizada por imagem. Valores maiores representam maior proximidade no contrato atual; a mediana da região da bbox é classificada em `very_near`, `near`, `medium` ou `far`. Não comparar esses valores como metros nem como escala absoluta entre frames.
 
-```bash
-curl -X POST "http://127.0.0.1:8000/detect?mode=exploration&use_open_vocab=true" -F "image=@tests/img_exemplo/[IA]corredor_elevador.jpg"
-```
+## Configuração
 
-Esse recurso nao e padrao porque precisa ser comparado em latencia e qualidade nas imagens do ARGUS IC. Use:
+| Variável | Finalidade |
+|---|---|
+| `ARGUS_BACKEND_HOST`, `ARGUS_BACKEND_PORT` | Obrigatórias ao usar `python -m app.server` |
+| `ARGUS_MVP_PROFILE` | Restrições do protótipo de demonstração |
+| `ARGUS_MAX_UPLOAD_BYTES` | Limite de bytes recebidos |
+| `ARGUS_MAX_DECODED_PIXELS` | Limite da imagem decodificada |
+| `ARGUS_DETECT_RETRY_AFTER_SECONDS` | Cabeçalho de nova tentativa quando ocupado |
+| `ARGUS_YOLO_MODEL_PATH` | Nome/caminho dos pesos gerais |
+| `ARGUS_YOLOE_MODEL_PATH`, `ARGUS_YOLO_WORLD_MODEL_PATH` | Pesos de vocabulário aberto |
+| `ARGUS_DETECT_URL` | URL completa para scripts HTTP; não é lida pelo app móvel |
 
-```bash
-python scripts/evaluate_navigation_detection.py --image-dir tests/img_exemplo --compare-open-vocab
-```
+A configuração Python é lida na importação: reinicie o processo após alterar variáveis. O app tem preferências independentes para host/protocolo/porta/timeouts. Não usar `--dart-define` para endereço do backend.
 
-## Modelo YOLO customizado futuro
-
-Para substituir o detector generico por um modelo treinado com classes de pontos de interesse e acessibilidade, exporte o melhor peso como `models/best.pt` e rode o backend com:
-
-```bash
-set ARGUS_YOLO_MODEL_PATH=models/best.pt
-```
-
-Para o detector open-vocabulary experimental, os caminhos podem ser ajustados com:
-
-```bash
-set ARGUS_YOLOE_MODEL_PATH=models/yoloe_custom.pt
-set ARGUS_YOLO_WORLD_MODEL_PATH=models/yolo_world_custom.pt
-```
+Consulte [desenvolvimento](DEVELOPMENT.md) para comandos e [CODEBASE](CODEBASE.md) para o mapa dos módulos. Preserve os nomes do contrato ao reorganizar código; mudanças exigem atualizar o parser Dart e os testes de ambos os lados.

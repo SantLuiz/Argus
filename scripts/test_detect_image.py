@@ -1,4 +1,5 @@
 import argparse
+import os
 import mimetypes
 from pathlib import Path
 
@@ -8,8 +9,11 @@ import requests
 def main() -> None:
     parser = argparse.ArgumentParser(description="Envia uma imagem para o endpoint /detect do ARGUS IC.")
     parser.add_argument("image_path", help="Caminho da imagem de teste.")
-    parser.add_argument("--url", default="http://127.0.0.1:8000/detect", help="URL do endpoint /detect.")
+    parser.add_argument("--url", default=os.getenv("ARGUS_DETECT_URL"), help="URL do endpoint /detect.")
     args = parser.parse_args()
+
+    if not args.url:
+        raise SystemExit("Informe --url ou defina ARGUS_DETECT_URL.")
 
     image_path = Path(args.image_path)
     if not image_path.exists():

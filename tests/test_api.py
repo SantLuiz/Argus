@@ -6,7 +6,7 @@ from PIL import Image
 
 import app.routes.detect as detect_route
 from app.main import app
-from app.schemas.detection import AudioPayload, DepthInfo, DetectionItem, DetectionResponse, ProcessingTime
+from app.schemas.detection import AudioPayload, DepthInfo, DetectionItem, DetectionResponse, ProcessingTime, ReadyResponse
 
 
 client = TestClient(app)
@@ -19,7 +19,20 @@ def test_health_check() -> None:
     assert response.json()["project"] == "ARGUS IC"
 
 
+def test_ready_check_reports_backend_state(monkeypatch) -> None:
+    monkeypatch.setattr(detect_route, "detection_pipeline", FakePipeline())
+
+    response = client.get("/ready")
+
+    assert response.status_code == 200
+    assert response.json()["ready"] is True
+    assert response.json()["project"] == "ARGUS IC"
+
+
 class FakePipeline:
+    def readiness(self, busy=False):
+        return ReadyResponse(status="ready", ready=not busy, busy=busy, models={"fake": "ready"}, notes=["teste"])
+
     def analyze(
         self,
         image,
@@ -57,6 +70,7 @@ class FakePipeline:
             },
             image_name=image_name,
             notes=["teste"],
+            depth_source="midas",
         )
 
 
@@ -79,8 +93,10 @@ def test_detect_accepts_image_upload(monkeypatch) -> None:
     assert data["detections"]
     assert data["message"]
     assert data["audio"]["language"] == "pt-BR"
+    assert data["audio"]["priority"] == "normal"
     assert data["detections"][0]["depth"]["proximity"] == "near"
     assert data["image_name"] == "teste.png"
+    assert data["depth_source"] == "midas"
 
 
 def test_detect_accepts_navigation_query_params(monkeypatch) -> None:
@@ -116,6 +132,7 @@ def test_detect_rejects_navigation_without_target(monkeypatch) -> None:
     )
 
     assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "TARGET_REQUIRED"
 
 
 def test_detect_accepts_routed_detection_query_params(monkeypatch) -> None:
@@ -137,3 +154,44 @@ def test_detect_accepts_routed_detection_query_params(monkeypatch) -> None:
     assert data["mode"] == "auto"
     assert data["detection_plan"]["use_semantic_segmentation"] is True
     assert data["detection_plan"]["use_ocr"] is True
+
+
+def test_detect_rejects_upload_larger_than_limit(monkeypatch) -> None:
+    monkeypatch.setattr(detect_route, "ARGUS_MAX_UPLOAD_BYTES", 4)
+
+    response = client.post(
+        "/detect",
+        files={"image": ("teste.png", BytesIO(b"12345"), "image/png")},
+    )
+
+    assert response.status_code == 413
+
+
+def test_detect_rejects_oversized_decoded_image(monkeypatch) -> None:
+    monkeypatch.setattr(detect_route, "detection_pipeline", FakePipeline())
+    monkeypatch.setattr(detect_route, "ARGUS_MAX_DECODED_PIXELS", 4)
+    monkeypatch.setattr(detect_route, "load_image_cv2", lambda image_bytes: np.zeros((3, 3, 3), dtype=np.uint8))
+
+    response = client.post(
+        "/detect",
+        files={"image": ("teste.png", BytesIO(b"valid"), "image/png")},
+    )
+
+    assert response.status_code == 413
+
+
+def test_detect_returns_busy_when_inference_is_already_running(monkeypatch) -> None:
+    monkeypatch.setattr(detect_route, "detection_pipeline", FakePipeline())
+    monkeypatch.setattr(detect_route, "load_image_cv2", lambda image_bytes: np.zeros((10, 10, 3), dtype=np.uint8))
+    detect_route.inference_lock.acquire()
+    try:
+        response = client.post(
+            "/detect",
+            files={"image": ("teste.png", BytesIO(b"valid"), "image/png")},
+        )
+    finally:
+        detect_route.inference_lock.release()
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "BACKEND_BUSY"
+    assert response.headers["retry-after"] == str(detect_route.ARGUS_DETECT_RETRY_AFTER_SECONDS)

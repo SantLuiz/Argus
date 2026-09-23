@@ -47,6 +47,8 @@ Não implementar, a menos que seja explicitamente pedido:
 
 ## Documentos que devem ser lidos antes de alterar o projeto
 
+Comece por `README.md` e `docs/CODEBASE.md` para localizar o fluxo ativo. Depois leia os fundamentos abaixo. Consulte `docs/DEVELOPMENT.md` para comandos e `docs/PENDENCIAS.md` para limitações conhecidas. `docs/README.md` é o índice da documentação.
+
 1. `docs/01_CONTEXTO_IC_ARGUS.md`
 2. `docs/02_ESCOPO_E_LIMITES.md`
 3. `docs/03_ARQUITETURA_TECNICA.md`
@@ -54,6 +56,17 @@ Não implementar, a menos que seja explicitamente pedido:
 5. `docs/05_REQUISITOS_E_FLUXOS.md`
 6. `docs/06_ROADMAP_E_TAREFAS_CODEX.md`
 7. `docs/07_FONTES_E_DECISOES.md`
+
+## Orientação operacional para outras IAs
+
+- O backend ativo está em `app/`, com entrada `app.main:app` e orquestração em `DetectionPipeline`. Não criar outro backend com base em uma árvore antiga.
+- O frontend único está em `app_flutter/`. O projeto Android já existe; não executar `flutter create` sobre ele como etapa normal.
+- Guias atuais estão diretamente em `docs/`; `docs/history/` preserva planos/evidências antigos e não autoriza implementação automática.
+- O reconhecimento de voz segue com falha no Redmi e está adiado a pedido do responsável. Não declarar resolvido nem retomá-lo durante tarefas não relacionadas.
+- Antes de editar, inspecionar `git status` e preservar trabalho local. Antes de publicar, revisar `git diff` e `git diff --cached`.
+- Validação: `python -m pytest tests -q` na raiz; `flutter analyze` e `flutter test` em `app_flutter/`. Testes unitários não comprovam STT, TalkBack, câmera nem qualidade dos modelos no aparelho.
+- Endereço do backend no app é preferência local. Não versionar `.env`, chaves, APKs, SDKs, logs, pesos ou resultados gerados.
+- Ao mudar um contrato JSON, atualizar o schema Python, o parser Dart e testes correspondentes. Ao mudar comportamento, atualizar os guias e as pendências.
 
 ## Regra de alinhamento com a IC
 

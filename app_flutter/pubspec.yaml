@@ -1,0 +1,26 @@
+name: argus_mobile
+description: Aplicativo Flutter minimo do ARGUS IC para camera, backend Python e TTS.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: 0.12.1
+  flutter_tts: 4.2.5
+  http: 1.6.0
+  http_parser: 4.1.2
+  image: 4.10.1
+  shared_preferences: 2.5.5
+  speech_to_text: 7.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 5.0.0
+
+flutter:
+  uses-material-design: true

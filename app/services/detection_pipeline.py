@@ -3,6 +3,7 @@ from typing import Protocol
 
 import numpy as np
 
+from app.config import ARGUS_MVP_PROFILE, ARGUS_MVP_TARGET_CLASSES
 from app.audio.speech_payload import build_audio_payload
 from app.detection.classic_tactile_detector import ClassicTactileDetector
 from app.detection.detection_merger import DetectionMerger
@@ -17,7 +18,8 @@ from app.navigation.local_navigator import LocalNavigator
 from app.navigation.navigation_state import AUTO_MODE, EXPLORATION_MODE, NAVIGATION_MODE
 from app.routing.generalist_scene_analyzer import GeneralistSceneAnalyzer
 from app.routing.scene_router import SceneRouter
-from app.schemas.detection import DetectionResponse, ObjectDetection, ProcessingTime
+from app.schemas.detection import DetectionResponse, ObjectDetection, ProcessingTime, ReadyResponse
+from app.errors import DepthUnavailableError, TargetDetectorUnavailableError
 from app.vision.depth import combine_detections_with_depth
 from app.vision.midas_estimator import MidasEstimator
 from app.vision.open_vocabulary_detector import OpenVocabularyDetector
@@ -90,12 +92,15 @@ class DetectionPipeline:
     ) -> DetectionResponse:
         if not isinstance(image, np.ndarray):
             raise TypeError("DetectionPipeline espera uma imagem OpenCV numpy.ndarray.")
+        if ARGUS_MVP_PROFILE and mode == NAVIGATION_MODE and _normalize_target(target_class) not in ARGUS_MVP_TARGET_CLASSES:
+            raise ValueError("No perfil MVP, o modo navigation aceita apenas target_class=door.")
 
         total_start = perf_counter()
         notes = [
             "Pipeline experimental com YOLO e profundidade monocular MiDaS.",
             "A profundidade e relativa e nao representa distancia exata em metros.",
         ]
+        depth_source = "not_run"
 
         detection_start = perf_counter()
         initial_plan = self.scene_router.build_plan(
@@ -123,6 +128,9 @@ class DetectionPipeline:
             use_classic_tactile=initial_plan.use_classic_tactile,
             use_ocr=initial_plan.use_ocr,
         )
+        if ARGUS_MVP_PROFILE:
+            detection_plan = _apply_mvp_profile(detection_plan, mode, target_class)
+            notes.append("Perfil MVP ativo: rota simplificada para Android, porta e MiDaS.")
 
         detection_groups: list[list[ObjectDetection]] = []
         models_called: list[str] = []
@@ -141,6 +149,10 @@ class DetectionPipeline:
             last_error = getattr(self.open_vocab_detector, "last_error", None)
             if not open_vocab_detections and last_error:
                 notes.append(f"Detector open-vocabulary indisponivel: {last_error}.")
+                if ARGUS_MVP_PROFILE and mode == NAVIGATION_MODE:
+                    raise TargetDetectorUnavailableError(
+                        "Detector de porta indisponivel no perfil MVP. Verifique pesos/cache do modelo open-vocabulary."
+                    )
         if detection_plan.use_semantic_segmentation:
             detection_groups.append(_safe_detect(self.semantic_detector, image, notes, "semantic_segmentation"))
             models_called.append("semantic_segmentation")
@@ -165,13 +177,21 @@ class DetectionPipeline:
         if filtered_detections:
             try:
                 depth_map = self.depth_estimator.estimate_depth(image)
+                depth_source = "midas"
             except Exception as exc:
+                if ARGUS_MVP_PROFILE:
+                    raise DepthUnavailableError(
+                        "MiDaS indisponivel no perfil MVP. A profundidade monocular real e obrigatoria."
+                    ) from exc
                 depth_map = _fallback_depth_map(image)
+                depth_source = "fallback"
                 notes.append(
                     "MiDaS nao ficou disponivel nesta execucao; foi usado fallback relativo "
                     f"para evitar falha do endpoint. Motivo: {exc.__class__.__name__}."
                 )
-            detections = prepare_navigation_detections(combine_detections_with_depth(filtered_detections, depth_map))
+            detections = prepare_navigation_detections(
+                combine_detections_with_depth(filtered_detections, depth_map, depth_source=depth_source)
+            )
             depth_ms = _elapsed_ms(depth_start)
         else:
             detections = []
@@ -182,7 +202,7 @@ class DetectionPipeline:
         else:
             navigation = build_navigation_hint(detections)
         message = self.message_generator.generate(detections, navigation, mode=mode)
-        audio = build_audio_payload(message)
+        audio = build_audio_payload(message, priority=_audio_priority(navigation))
 
         return DetectionResponse(
             detections=detections,
@@ -201,6 +221,28 @@ class DetectionPipeline:
             models_called=models_called,
             navigation=navigation,
             image_name=image_name,
+            notes=notes,
+            depth_source=depth_source,
+        )
+
+    def readiness(self, busy: bool = False) -> ReadyResponse:
+        """Estado leve para o app distinguir backend vivo de backend pronto."""
+
+        models = {
+            "default_yolo": "lazy",
+            "midas": "lazy",
+            "open_vocab": "lazy",
+        }
+        notes = ["Modelos sao carregados sob demanda neste processo."]
+        if ARGUS_MVP_PROFILE:
+            notes.append("Perfil MVP ativo: navigation aceita porta e exige MiDaS real quando houver deteccoes.")
+
+        return ReadyResponse(
+            status="ready",
+            ready=not busy,
+            busy=busy,
+            mvp_profile=ARGUS_MVP_PROFILE,
+            models=models,
             notes=notes,
         )
 
@@ -223,6 +265,38 @@ def _fallback_depth_map(image: np.ndarray) -> np.ndarray:
 
     vertical_gradient = np.linspace(0.0, 1.0, height, dtype=np.float32)
     return np.repeat(vertical_gradient[:, None], width, axis=1)
+
+
+def _normalize_target(target_class: str | None) -> str | None:
+    if target_class is None:
+        return None
+    return target_class.strip().lower()
+
+
+def _apply_mvp_profile(detection_plan, mode: str, target_class: str | None):
+    if mode != NAVIGATION_MODE:
+        detection_plan.use_semantic_segmentation = False
+        detection_plan.use_tactile_specialist = False
+        detection_plan.use_classic_tactile = False
+        detection_plan.use_ocr = False
+        detection_plan.use_stair_ramp_heuristics = False
+        return detection_plan
+
+    detection_plan.use_open_vocab = True
+    detection_plan.use_semantic_segmentation = False
+    detection_plan.use_tactile_specialist = False
+    detection_plan.use_classic_tactile = False
+    detection_plan.use_ocr = False
+    detection_plan.use_stair_ramp_heuristics = False
+    detection_plan.target_classes = ["door"]
+    detection_plan.reason.append("Perfil MVP: navegacao restrita a porta.")
+    return detection_plan
+
+
+def _audio_priority(navigation) -> str:
+    if navigation is not None and navigation.action == "stop":
+        return "critical"
+    return "normal"
 
 
 def _safe_detect(detector: ObjectDetector, image: np.ndarray, notes: list[str], label: str) -> list[ObjectDetection]:

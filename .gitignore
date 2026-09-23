@@ -19,7 +19,8 @@ __pycache__/
 .idea/
 
 # Saidas geradas
-results/
+results/*
+!results/README.md
 runs/
 logs/
 *.log
@@ -29,6 +30,12 @@ logs/
 *.pth
 *.onnx
 *.engine
+*.apk
+*.aab
+*.keystore
+*.jks
+.env.*
+!.env.example
 models/*.pt
 models/*.pth
 models/*.onnx
@@ -36,6 +43,7 @@ models/*.onnx
 # Instaladores e arquivos temporarios locais
 *.exe
 mobileclip_blt.ts
+.tools/
 
 # Sistema operacional
 .DS_Store

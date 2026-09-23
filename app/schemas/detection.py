@@ -5,6 +5,7 @@ class DepthInfo(BaseModel):
     relative_value: float = Field(ge=0.0, le=1.0)
     proximity: str
     label_pt: str
+    source: str = "unknown"
 
 
 class ObjectDetection(BaseModel):
@@ -57,6 +58,22 @@ class AudioPayload(BaseModel):
     text: str
     language: str = "pt-BR"
     mode: str = "tts_client"
+    priority: str = "normal"
+
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+
+
+class ReadyResponse(BaseModel):
+    status: str
+    project: str = "ARGUS IC"
+    ready: bool
+    busy: bool = False
+    mvp_profile: bool = False
+    models: dict[str, str] = {}
+    notes: list[str] = []
 
 
 class DetectionResponse(BaseModel):
@@ -73,3 +90,4 @@ class DetectionResponse(BaseModel):
     navigation: NavigationHint | None = None
     image_name: str | None = None
     notes: list[str] = []
+    depth_source: str = "unknown"

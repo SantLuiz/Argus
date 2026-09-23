@@ -1,4 +1,5 @@
 import json
+import os
 import mimetypes
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,13 +11,12 @@ import numpy as np
 import requests
 
 
-API_URL = "http://127.0.0.1:8000/detect"
+API_URL = os.getenv("ARGUS_DETECT_URL")
 OUTPUT_ROOT = Path("results") / "curl_runner"
 IMAGE_PATH = r"tests\img_exemplo\[IA]corredor_obstaculos.jpg"
 
 RUNS = 5
 WARMUP_RUNS = 1
-IMAGE_PATH = r"tests\img_exemplo\[IA]corredor_obstaculos.jpg"
 TARGET_CLASS = "objects"
 
 
@@ -85,6 +85,8 @@ PROXIMITY_COLORS = {
 
 
 def main() -> None:
+    if not API_URL:
+        raise SystemExit("Defina ARGUS_DETECT_URL com a URL completa do endpoint /detect.")
     image_path = Path(IMAGE_PATH)
     if not image_path.exists():
         raise SystemExit(f"Imagem nao encontrada: {image_path}")

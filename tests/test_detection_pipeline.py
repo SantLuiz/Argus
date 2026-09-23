@@ -84,6 +84,8 @@ def test_detection_pipeline_integrates_detection_depth_position_and_message() ->
     assert result.navigation.target_class_name == "pessoa"
     assert result.message.startswith("Pessoa à direita")
     assert result.audio.text == result.message
+    assert result.audio.priority == "normal"
+    assert result.depth_source == "midas"
     assert result.processing_time_ms.depth_ms >= 0
 
 
@@ -100,6 +102,7 @@ def test_detection_pipeline_navigation_mode_guides_to_target() -> None:
     assert result.navigation is not None
     assert result.navigation.target_found is True
     assert result.navigation.action == "forward"
+    assert result.audio.priority == "normal"
     assert result.message == "Porta a frente, siga em frente."
 
 
@@ -159,4 +162,46 @@ def test_detection_pipeline_uses_fallback_depth_when_midas_fails() -> None:
     result = pipeline.analyze(image)
 
     assert result.detections
+    assert result.depth_source == "fallback"
     assert any("fallback relativo" in note for note in result.notes)
+
+
+def test_detection_pipeline_marks_stop_audio_as_critical() -> None:
+    image = np.zeros((4, 4, 3), dtype=np.uint8)
+
+    class CenterPersonDetector:
+        def detect(self, image):
+            return [ObjectDetection(class_name="person", confidence=0.90, bbox=[1, 0, 3, 2])]
+
+    class VeryNearDepthEstimator:
+        def estimate_depth(self, image):
+            return np.ones((4, 4), dtype=np.float32)
+
+    pipeline = DetectionPipeline(
+        detector=CenterPersonDetector(),
+        depth_estimator=VeryNearDepthEstimator(),
+    )
+
+    result = pipeline.analyze(image, mode="navigation", target_class="door")
+
+    assert result.navigation is not None
+    assert result.navigation.action == "stop"
+    assert result.audio.priority == "critical"
+
+
+def test_detection_pipeline_mvp_profile_requires_real_depth(monkeypatch) -> None:
+    import app.services.detection_pipeline as pipeline_module
+
+    monkeypatch.setattr(pipeline_module, "ARGUS_MVP_PROFILE", True)
+    image = np.zeros((4, 4, 3), dtype=np.uint8)
+    pipeline = DetectionPipeline(
+        detector=FakeDetector(),
+        depth_estimator=BrokenDepthEstimator(),
+    )
+
+    try:
+        pipeline.analyze(image)
+    except pipeline_module.DepthUnavailableError as exc:
+        assert exc.code == "DEPTH_UNAVAILABLE"
+    else:
+        raise AssertionError("Perfil MVP deve falhar quando MiDaS nao estiver disponivel.")
