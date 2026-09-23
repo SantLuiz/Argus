@@ -30,10 +30,10 @@ Se não houver detecções, MiDaS não é executado e `depth_source=not_run`. Se
 
 - `YoloDetector`: objetos gerais; pesos indicados por `ARGUS_YOLO_MODEL_PATH`.
 - `OpenVocabularyDetector`: YOLOE com alternativa YOLO-World; caminhos em `ARGUS_YOLOE_MODEL_PATH` e `ARGUS_YOLO_WORLD_MODEL_PATH`.
-- `MidasEstimator`: `MiDaS_small` via Torch Hub, carregado na primeira inferência. Pode precisar de acesso à rede/cache.
+- `MidasEstimator`: `MiDaS_small` via Torch Hub, carregado na primeira inferência. O cache deve ficar em `models/torch` por meio de `TORCH_HOME`.
 - Especialistas de piso tátil, OCR, segmentação e heurísticas: experimentais, preservados para comparação científica.
 
-Coloque pesos customizados em `models/` e aponte a variável correspondente. Não inclua pesos no Git. O detector COCO genérico não garante classes como portas ou piso tátil; veja [datasets](dataset_accessibilidade.md) e [roteamento](routed_detection_architecture.md).
+Rode `scripts/prepare_models.ps1` antes de demonstrações. Ele prepara `models/yolo/yolov8n.pt`, `models/yolo/yoloe-11s-seg.pt`, `models/yolo/yolov8s-world.pt` e o cache do MiDaS em `models/torch`. `run_backend_mvp.ps1` aponta para esses caminhos automaticamente quando as variáveis ainda não foram definidas. Coloque pesos customizados em `models/` e aponte a variável correspondente. Não inclua pesos no Git. O detector COCO genérico não garante classes como portas ou piso tátil; veja [datasets](dataset_accessibilidade.md) e [roteamento](routed_detection_architecture.md).
 
 A profundidade é normalizada por imagem. Valores maiores representam maior proximidade no contrato atual; a mediana da região da bbox é classificada em `very_near`, `near`, `medium` ou `far`. Não comparar esses valores como metros nem como escala absoluta entre frames.
 
@@ -48,6 +48,8 @@ A profundidade é normalizada por imagem. Valores maiores representam maior prox
 | `ARGUS_DETECT_RETRY_AFTER_SECONDS` | Cabeçalho de nova tentativa quando ocupado |
 | `ARGUS_YOLO_MODEL_PATH` | Nome/caminho dos pesos gerais |
 | `ARGUS_YOLOE_MODEL_PATH`, `ARGUS_YOLO_WORLD_MODEL_PATH` | Pesos de vocabulário aberto |
+| `ARGUS_TACTILE_MODEL_PATH` | Peso opcional do especialista de piso tátil |
+| `TORCH_HOME` | Cache local do PyTorch/Torch Hub usado pelo MiDaS |
 | `ARGUS_DETECT_URL` | URL completa para scripts HTTP; não é lida pelo app móvel |
 
 A configuração Python é lida na importação: reinicie o processo após alterar variáveis. O app tem preferências independentes para host/protocolo/porta/timeouts. Não usar `--dart-define` para endereço do backend.

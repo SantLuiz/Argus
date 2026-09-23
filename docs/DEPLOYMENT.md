@@ -17,7 +17,7 @@ O exemplo faz o processo escutar `0.0.0.0:8000` **dentro do contêiner**, mas pu
 
 `.env` é usado pelo Compose para interpolar o YAML; apenas variáveis declaradas em `environment` são enviadas ao processo. Para personalizar pesos, acrescente as variáveis de modelo em `environment` e monte o diretório de pesos correspondente. O Compose atual não monta modelos nem cache persistente automaticamente.
 
-O Dockerfile instala dependências, copia `app/` e executa como usuário `argus`. Pesos não entram na imagem. O primeiro uso dos modelos pode baixar arquivos para o cache do usuário; sem volumes, eles podem desaparecer ao recriar o contêiner. Faça uma inferência real antes da demonstração.
+O Dockerfile instala dependências, copia `app/` e executa como usuário `argus`. Pesos não entram na imagem. No fluxo local sem Docker, rode `scripts/prepare_models.ps1` e mantenha `models/` preservado. Em Docker, monte `models/` como volume e encaminhe `ARGUS_YOLO_MODEL_PATH`, `ARGUS_YOLOE_MODEL_PATH`, `ARGUS_YOLO_WORLD_MODEL_PATH`, `ARGUS_TACTILE_MODEL_PATH` e `TORCH_HOME` para caminhos dentro do contêiner. Faça uma inferência real antes da demonstração.
 
 Validação:
 

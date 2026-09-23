@@ -7,6 +7,13 @@ services:
       ARGUS_MAX_DECODED_PIXELS: "12000000"
       ARGUS_BACKEND_HOST: "${ARGUS_BACKEND_HOST:?configure ARGUS_BACKEND_HOST}"
       ARGUS_BACKEND_PORT: "${ARGUS_BACKEND_PORT:?configure ARGUS_BACKEND_PORT}"
+      ARGUS_YOLO_MODEL_PATH: "/app/models/yolo/yolov8n.pt"
+      ARGUS_YOLOE_MODEL_PATH: "/app/models/yolo/yoloe-11s-seg.pt"
+      ARGUS_YOLO_WORLD_MODEL_PATH: "/app/models/yolo/yolov8s-world.pt"
+      ARGUS_TACTILE_MODEL_PATH: "/app/models/yolo/tactile_best.pt"
+      TORCH_HOME: "/app/models/torch"
     ports:
       - "${ARGUS_PUBLISHED_HOST:?configure ARGUS_PUBLISHED_HOST}:${ARGUS_PUBLISHED_PORT:?configure ARGUS_PUBLISHED_PORT}:${ARGUS_BACKEND_PORT:?configure ARGUS_BACKEND_PORT}"
+    volumes:
+      - ./models:/app/models
     restart: unless-stopped

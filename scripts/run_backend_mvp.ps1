@@ -59,7 +59,10 @@ function Get-Python {
 }
 
 function Invoke-HealthCheck {
-    param([string]$BaseUrl)
+    param(
+        [string]$BaseUrl,
+        [string]$PublicUrl
+    )
 
     $deadline = (Get-Date).AddSeconds(40)
     do {
@@ -68,6 +71,13 @@ function Invoke-HealthCheck {
             $ready = Invoke-RestMethod -Uri "$BaseUrl/ready" -TimeoutSec 3
             Write-Host "Health: $($health.status) / $($health.project)"
             Write-Host "Ready: ready=$($ready.ready), busy=$($ready.busy), mvp_profile=$($ready.mvp_profile)"
+            if ($PublicUrl -and $PublicUrl -match "://0\.0\.0\.0:") {
+                $uri = [Uri]$PublicUrl
+                Write-Host "Backend escutando em todas as interfaces na porta $($uri.Port)."
+                Write-Host "No celular, teste http://IP_DO_PC:$($uri.Port)/health; nao use 0.0.0.0 no app."
+            } elseif ($PublicUrl -and $PublicUrl -ne $BaseUrl) {
+                Write-Host "Teste no celular: $PublicUrl/health"
+            }
             return
         } catch {
             Start-Sleep -Seconds 1
@@ -75,6 +85,38 @@ function Invoke-HealthCheck {
     } while ((Get-Date) -lt $deadline)
 
     throw "Backend nao respondeu em $BaseUrl dentro do tempo esperado."
+}
+
+function Get-HealthCheckUrl {
+    param(
+        [string]$HostAddress,
+        [int]$Port
+    )
+
+    if ($HostAddress -eq "0.0.0.0" -or $HostAddress -eq "::") {
+        return "http://127.0.0.1:$Port"
+    }
+
+    return "http://${HostAddress}:$Port"
+}
+
+function Set-DefaultModelEnvironment {
+    param([string]$RepoRoot)
+
+    $modelDefaults = @{
+        "ARGUS_YOLO_MODEL_PATH" = "models\yolo\yolov8n.pt"
+        "ARGUS_YOLOE_MODEL_PATH" = "models\yolo\yoloe-11s-seg.pt"
+        "ARGUS_YOLO_WORLD_MODEL_PATH" = "models\yolo\yolov8s-world.pt"
+        "ARGUS_TACTILE_MODEL_PATH" = "models\yolo\tactile_best.pt"
+        "TORCH_HOME" = "models\torch"
+    }
+
+    foreach ($name in $modelDefaults.Keys) {
+        if (-not [Environment]::GetEnvironmentVariable($name, "Process")) {
+            $relativePath = $modelDefaults[$name]
+            [Environment]::SetEnvironmentVariable($name, (Join-Path $RepoRoot $relativePath), "Process")
+        }
+    }
 }
 
 function Enable-TailscaleServeIfRequested {
@@ -112,6 +154,8 @@ if ($Port -lt 1 -or $Port -gt 65535) {
 
 $python = Get-Python -RepoRoot $repoRoot
 $baseUrl = "http://${HostAddress}:$Port"
+$healthCheckUrl = Get-HealthCheckUrl -HostAddress $HostAddress -Port $Port
+Set-DefaultModelEnvironment -RepoRoot $repoRoot
 
 Write-Step "Ambiente Python"
 Invoke-Native $python @("--version")
@@ -144,7 +188,7 @@ if ($Detached) {
 
     $pidPath = Join-Path $logDir "backend.pid"
     Set-Content -LiteralPath $pidPath -Value $process.Id
-    Invoke-HealthCheck -BaseUrl $baseUrl
+    Invoke-HealthCheck -BaseUrl $healthCheckUrl -PublicUrl $baseUrl
     Enable-TailscaleServeIfRequested -BackendUrl $baseUrl -HttpsPort $TailscaleHttpsPort -Enabled:$EnableTailscaleServe.IsPresent
     Write-Host ""
     Write-Host "Backend rodando em segundo plano. PID: $($process.Id)"

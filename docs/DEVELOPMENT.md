@@ -7,6 +7,7 @@ Execute os comandos a partir da raiz do repositório, exceto quando indicado `cd
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\scripts\prepare_models.ps1
 .\scripts\run_backend_mvp.ps1 -SkipDependencyInstall
 ```
 
@@ -33,6 +34,18 @@ $env:ARGUS_BACKEND_PORT = '8000'
 
 O Python lê variáveis de ambiente; não carrega `.env` automaticamente. O arquivo `.env.example` serve de referência e é lido pelo Docker Compose após ser copiado para `.env`.
 
+### Modelos locais
+
+Antes de uma demonstração, rode:
+
+```powershell
+.\scripts\prepare_models.ps1
+```
+
+O script baixa e aquece os pesos em `models/`: `models/yolo/yolov8n.pt`, `models/yolo/yoloe-11s-seg.pt`, `models/yolo/yolov8s-world.pt` e o cache do MiDaS em `models/torch`. Esses arquivos são locais e não entram no Git.
+
+`run_backend_mvp.ps1` aponta automaticamente `ARGUS_YOLO_MODEL_PATH`, `ARGUS_YOLOE_MODEL_PATH`, `ARGUS_YOLO_WORLD_MODEL_PATH`, `ARGUS_TACTILE_MODEL_PATH` e `TORCH_HOME` para essa estrutura quando as variáveis ainda não foram definidas. Se precisar testar outro peso, defina a variável antes de subir o backend.
+
 ### Testar a API
 
 Com o servidor ativo:
@@ -43,7 +56,7 @@ Invoke-RestMethod http://127.0.0.1:8000/ready
 .\.venv\Scripts\python.exe scripts/test_detect_image.py 'tests/img_exemplo/[IA]corredor_elevador.jpg' --url http://127.0.0.1:8000/detect
 ```
 
-Os endereços acima são exemplos locais. No celular, use o IP/host alcançável da máquina. A primeira inferência pode baixar modelos e ser lenta. `/ready` não aquece nem comprova disponibilidade dos pesos.
+Os endereços acima são exemplos locais. No celular, use o IP/host alcançável da máquina. A primeira inferência pode ser lenta mesmo com modelos locais, pois o processo ainda precisa carregar os pesos para a memória. `/ready` não aquece nem comprova disponibilidade dos pesos.
 
 ## Flutter e Android
 
@@ -86,6 +99,7 @@ Os caches e a chave de debug ficam em `.tools/`; `ARGUS_ANDROID_USER_HOME` permi
 
 | Script em `scripts/` | Uso |
 |---|---|
+| `prepare_models.ps1` | Baixa/aqueça os modelos locais em `models/` |
 | `test_detect_image.py` | Envia imagem à API; exige `--url` ou `ARGUS_DETECT_URL` |
 | `test_yolo_image.py` | Executa YOLO local: `python scripts/test_yolo_image.py <imagem>` |
 | `benchmark_api.py` | Compara configurações pela API; defina `ARGUS_DETECT_URL`; imagem e repetições ficam nas constantes iniciais |
