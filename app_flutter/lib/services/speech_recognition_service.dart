@@ -1,17 +1,21 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../models/debug_event.dart';
+import 'debug_log_service.dart';
+
 typedef SpeechTextCallback = void Function(String text);
 
 class SpeechRecognitionService {
-  SpeechRecognitionService({SpeechToText? speech})
-      : _speech = speech ?? SpeechToText();
+  SpeechRecognitionService({SpeechToText? speech, DebugLogService? debugLog})
+      : _speech = speech ?? SpeechToText(),
+        _debugLog = debugLog;
 
   final SpeechToText _speech;
+  final DebugLogService? _debugLog;
   bool _initialized = false;
   Completer<String>? _activeCompleter;
   String _bestWords = '';
@@ -31,12 +35,21 @@ class SpeechRecognitionService {
     _activeListenSession = session;
     _activeCompleter = completer;
     _bestWords = '';
+    String lastReportedWords = '';
+    final operationId = 'speech-$session';
+    _record(DebugEventCodes.speechListenRequested, 'Escuta solicitada em pt_BR.', operationId: operationId);
     _log('listenOnce start session=$session');
     if (!_initialized) {
       _initialized = await _speech.initialize(
-        debugLogging: kDebugMode,
+        debugLogging: false,
         finalTimeout: const Duration(seconds: 3),
         onError: (SpeechRecognitionError error) {
+          _record(DebugEventCodes.speechError,
+              '${error.errorMsg}; permanente=${error.permanent}.',
+              severity: DebugSeverity.error,
+              operationId: _activeListenSession == null
+                  ? null
+                  : 'speech-$_activeListenSession');
           _log(
             'error session=$_activeListenSession msg=${error.errorMsg} '
             'permanent=${error.permanent}',
@@ -47,6 +60,10 @@ class SpeechRecognitionService {
           }
         },
         onStatus: (status) {
+          _record(DebugEventCodes.speechStatus, 'Status nativo: $status.',
+              operationId: _activeListenSession == null
+                  ? null
+                  : 'speech-$_activeListenSession');
           _log(
             'status session=$_activeListenSession status=$status '
             'best="$_bestWords"',
@@ -59,6 +76,7 @@ class SpeechRecognitionService {
           }
         },
       );
+      _record(DebugEventCodes.speechAvailability, _initialized ? 'Reconhecimento de fala disponível.' : 'Reconhecimento de fala indisponível.', severity: _initialized ? DebugSeverity.info : DebugSeverity.warning, operationId: operationId);
     }
     if (!_initialized) {
       throw Exception('Reconhecimento de fala indisponivel.');
@@ -70,12 +88,17 @@ class SpeechRecognitionService {
         listenFor: listenFor,
         pauseFor: pauseFor,
         onResult: (SpeechRecognitionResult result) {
+          if (_activeListenSession != session) return;
           _bestWords = result.recognizedWords.trim();
           _log(
             'result session=$session final=${result.finalResult} '
             'words="$_bestWords"',
           );
-          onText?.call(_bestWords);
+          if (result.finalResult || _bestWords != lastReportedWords) {
+            lastReportedWords = _bestWords;
+            _record(result.finalResult ? DebugEventCodes.speechFinal : DebugEventCodes.speechPartial, result.finalResult ? 'Texto final: "$_bestWords".' : 'Texto parcial: "$_bestWords".', operationId: operationId);
+            onText?.call(_bestWords);
+          }
           if (result.finalResult && !completer.isCompleted) {
             completer.complete(_bestWords);
           }
@@ -86,6 +109,7 @@ class SpeechRecognitionService {
     return completer.future.timeout(
       timeout,
       onTimeout: () async {
+        _record(DebugEventCodes.speechTimeout, 'Tempo limite da escuta.', severity: DebugSeverity.warning, operationId: operationId);
         _log('timeout session=$session best="$_bestWords"');
         await _stopSpeech();
         return _bestWords;
@@ -105,6 +129,7 @@ class SpeechRecognitionService {
       'stopAndGetText requested best="$_bestWords" hasActive=${active != null}',
     );
     await _stopSpeech();
+    _record(DebugEventCodes.speechStopped, 'Parada da escuta solicitada.', operationId: _activeListenSession == null ? null : 'speech-$_activeListenSession');
     if (active != null && !active.isCompleted) {
       await Future<void>.delayed(const Duration(milliseconds: 900));
     }
@@ -119,6 +144,7 @@ class SpeechRecognitionService {
   Future<void> cancel() async {
     _log('cancel requested');
     await _runSpeechOperation(_speech.cancel);
+    _record(DebugEventCodes.speechCanceled, 'Escuta cancelada.', operationId: _activeListenSession == null ? null : 'speech-$_activeListenSession');
     final active = _activeCompleter;
     if (active != null && !active.isCompleted) {
       active.complete('');
@@ -145,8 +171,10 @@ class SpeechRecognitionService {
   }
 
   void _log(String message) {
-    if (kDebugMode) {
-      debugPrint('[ARGUS_VOICE][SpeechRecognitionService] $message');
-    }
+    // Mantém os pontos de diagnóstico existentes sem emitir eventos duplicados.
+  }
+
+  void _record(String code, String message, {DebugSeverity severity = DebugSeverity.info, String? operationId}) {
+    _debugLog?.record(category: 'speech', code: code, message: message, severity: severity, operationId: operationId);
   }
 }

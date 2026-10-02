@@ -13,6 +13,8 @@ class ArgusSettings {
     this.detectTimeoutSeconds = 30,
     this.ttsVolumePercent = 100,
     this.showTranscription = true,
+    this.debugEnabled = false,
+    this.passiveListeningEnabled = false,
   });
 
   final String scheme;
@@ -22,6 +24,8 @@ class ArgusSettings {
   final int detectTimeoutSeconds;
   final int ttsVolumePercent;
   final bool showTranscription;
+  final bool debugEnabled;
+  final bool passiveListeningEnabled;
 
   bool get hasBackend => host.trim().isNotEmpty;
 
@@ -44,6 +48,8 @@ class ArgusSettings {
     int? detectTimeoutSeconds,
     int? ttsVolumePercent,
     bool? showTranscription,
+    bool? debugEnabled,
+    bool? passiveListeningEnabled,
   }) {
     return ArgusSettings(
       scheme: scheme ?? this.scheme,
@@ -53,6 +59,9 @@ class ArgusSettings {
       detectTimeoutSeconds: detectTimeoutSeconds ?? this.detectTimeoutSeconds,
       ttsVolumePercent: ttsVolumePercent ?? this.ttsVolumePercent,
       showTranscription: showTranscription ?? this.showTranscription,
+      debugEnabled: debugEnabled ?? this.debugEnabled,
+      passiveListeningEnabled:
+          passiveListeningEnabled ?? this.passiveListeningEnabled,
     );
   }
 }
@@ -68,10 +77,14 @@ class SettingsService extends ChangeNotifier {
   static const _detectTimeoutKey = 'argus.backend.detectTimeoutSeconds';
   static const _ttsVolumeKey = 'argus.tts.volumePercent';
   static const _showTranscriptionKey = 'argus.voice.showTranscription';
+  static const _debugEnabledKey = 'argus.debug.enabled';
+  static const _passiveListeningEnabledKey =
+      'argus.voice.passiveListeningEnabled';
 
   final SharedPreferencesAsync _preferences;
 
   ArgusSettings settings = const ArgusSettings();
+  Future<void> _writeQueue = Future<void>.value();
 
   Future<void> load() async {
     final scheme = await _preferences.getString(_schemeKey);
@@ -81,6 +94,9 @@ class SettingsService extends ChangeNotifier {
     final detectTimeout = await _preferences.getInt(_detectTimeoutKey);
     final volume = await _preferences.getInt(_ttsVolumeKey);
     final showTranscription = await _preferences.getBool(_showTranscriptionKey);
+    final debugEnabled = await _preferences.getBool(_debugEnabledKey);
+    final passiveListeningEnabled =
+        await _preferences.getBool(_passiveListeningEnabledKey);
     settings = ArgusSettings(
       scheme: _validScheme(scheme) ? scheme! : 'https',
       host: host?.trim() ?? '',
@@ -89,11 +105,24 @@ class SettingsService extends ChangeNotifier {
       detectTimeoutSeconds: _clampTimeout(detectTimeout, 30),
       ttsVolumePercent: _clampVolume(volume),
       showTranscription: showTranscription ?? true,
+      debugEnabled: debugEnabled ?? false,
+      passiveListeningEnabled: passiveListeningEnabled ?? false,
     );
     notifyListeners();
   }
 
-  Future<void> save(ArgusSettings value) async {
+  Future<void> save(ArgusSettings value) => _enqueueSave(() => value);
+
+  Future<void> update(ArgusSettings Function(ArgusSettings current) change) =>
+      _enqueueSave(() => change(settings));
+
+  Future<void> _enqueueSave(ArgusSettings Function() valueBuilder) {
+    final operation = _writeQueue.then((_) => _write(valueBuilder()));
+    _writeQueue = operation.then<void>((_) {}, onError: (_) {});
+    return operation;
+  }
+
+  Future<void> _write(ArgusSettings value) async {
     final normalized = ArgusSettings(
       scheme: _validScheme(value.scheme) ? value.scheme : 'https',
       host: value.host.trim(),
@@ -102,6 +131,8 @@ class SettingsService extends ChangeNotifier {
       detectTimeoutSeconds: _clampTimeout(value.detectTimeoutSeconds, 30),
       ttsVolumePercent: _clampVolume(value.ttsVolumePercent),
       showTranscription: value.showTranscription,
+      debugEnabled: value.debugEnabled,
+      passiveListeningEnabled: value.passiveListeningEnabled,
     );
     await _preferences.setString(_schemeKey, normalized.scheme);
     await _preferences.setString(_hostKey, normalized.host);
@@ -116,15 +147,24 @@ class SettingsService extends ChangeNotifier {
     await _preferences.setInt(_ttsVolumeKey, normalized.ttsVolumePercent);
     await _preferences.setBool(
         _showTranscriptionKey, normalized.showTranscription);
+    await _preferences.setBool(_debugEnabledKey, normalized.debugEnabled);
+    await _preferences.setBool(
+        _passiveListeningEnabledKey, normalized.passiveListeningEnabled);
     settings = normalized;
     notifyListeners();
   }
 
   Future<void> setVolumePercent(int value) =>
-      save(settings.copyWith(ttsVolumePercent: _clampVolume(value)));
+      _enqueueSave(() => settings.copyWith(ttsVolumePercent: _clampVolume(value)));
 
   Future<void> setShowTranscription(bool value) =>
-      save(settings.copyWith(showTranscription: value));
+      _enqueueSave(() => settings.copyWith(showTranscription: value));
+
+  Future<void> setDebugEnabled(bool value) =>
+      _enqueueSave(() => settings.copyWith(debugEnabled: value));
+
+  Future<void> setPassiveListeningEnabled(bool value) => _enqueueSave(
+      () => settings.copyWith(passiveListeningEnabled: value));
 
   static bool _validScheme(String? value) =>
       value == 'https' || value == 'http';

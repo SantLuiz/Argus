@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/debug_event.dart';
 import '../models/voice_command.dart';
 import '../models/voice_state.dart';
 import '../services/feedback_service.dart';
+import '../services/debug_log_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../services/voice_command_parser.dart';
 
@@ -16,18 +18,23 @@ class VoiceInputController extends ChangeNotifier {
     required FeedbackService feedback,
     required VoiceCommandHandler onCommand,
     VoiceCommandParser parser = const VoiceCommandParser(),
+    DebugLogService? debugLog,
   })  : _speech = speech,
         _feedback = feedback,
         _onCommand = onCommand,
-        _parser = parser;
+        _parser = parser,
+        _debugLog = debugLog;
 
   final SpeechRecognitionService _speech;
   final FeedbackService _feedback;
   final VoiceCommandHandler _onCommand;
   final VoiceCommandParser _parser;
+  final DebugLogService? _debugLog;
 
   VoiceState state = const VoiceState();
   bool _passiveRequested = false;
+  bool _passiveEnabled = false;
+  bool _screenActive = true;
   bool _disposed = false;
   int _session = 0;
   int? _wakeFeedbackSession;
@@ -40,18 +47,74 @@ class VoiceInputController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get passiveEnabled => _passiveEnabled;
+  bool get screenActive => _screenActive;
+
+  Future<void> setPassiveEnabled(bool value) async {
+    if (_passiveEnabled == value) return;
+    _passiveEnabled = value;
+    _record(DebugEventCodes.settingChanged,
+        value ? 'Escuta passiva ativada.' : 'Escuta passiva desativada.');
+    if (!value) {
+      _passiveRequested = false;
+      if (state.mode == VoiceInputMode.passive ||
+          state.mode == VoiceInputMode.wakeCommand) {
+        final cancellationSession = ++_session;
+        await _speech.cancel();
+        if (!_disposed && _session == cancellationSession) {
+          state = state.copyWith(
+            mode: VoiceInputMode.suspended,
+            listening: false,
+            transcription: '',
+            message: 'Escuta passiva desativada.',
+          );
+          notifyListeners();
+        }
+      }
+      return;
+    }
+    await startPassive();
+  }
+
+  Future<void> setScreenActive(bool value) async {
+    if (_screenActive == value) return;
+    _screenActive = value;
+    if (!value) {
+      _passiveRequested = false;
+      final cancellationSession = ++_session;
+      await _speech.cancel();
+      if (_disposed || _session != cancellationSession || _screenActive) return;
+      state = state.copyWith(
+        mode: VoiceInputMode.suspended,
+        listening: false,
+        processing: false,
+        transcription: '',
+        message: 'Escuta pausada.',
+      );
+      notifyListeners();
+      _record(DebugEventCodes.passiveSuspended, 'Tela indisponível; escuta cancelada.');
+      return;
+    }
+    await startPassive();
+  }
+
   Future<void> startPassive() async {
-    if (_disposed || _passiveRequested || state.pushToTalkActive) {
+    if (_disposed || !_passiveEnabled || !_screenActive ||
+        _passiveRequested || state.mode == VoiceInputMode.pushToTalk ||
+        state.processing || _pushStartInProgress) {
       return;
     }
     _passiveRequested = true;
+    _record(DebugEventCodes.passiveStarted, 'Ciclo de escuta passiva iniciado.');
     _runPassiveLoop(++_session);
   }
 
   Future<void> suspendPassive({String message = ''}) async {
     _passiveRequested = false;
-    _session++;
+    final cancellationSession = ++_session;
     await _speech.cancel();
+    if (_disposed || _session != cancellationSession) return;
+    _record(DebugEventCodes.passiveSuspended, message.isEmpty ? 'Escuta passiva suspensa.' : message);
     state = state.copyWith(
       mode: VoiceInputMode.suspended,
       listening: false,
@@ -63,7 +126,8 @@ class VoiceInputController extends ChangeNotifier {
   }
 
   Future<void> beginPushToTalk() async {
-    if (_disposed || state.processing) {
+    if (_disposed || !_screenActive || state.processing ||
+        state.mode == VoiceInputMode.pushToTalk || _pushStartInProgress) {
       return;
     }
     _passiveRequested = false;
@@ -72,6 +136,7 @@ class VoiceInputController extends ChangeNotifier {
     _pushFinishRequested = false;
     _pushProcessed = false;
     _log('push start requested session=$session');
+    _record(DebugEventCodes.pushToTalkStarted, 'Push-to-talk iniciado.', operationId: 'voice-$session');
     state = state.copyWith(
       mode: VoiceInputMode.pushToTalk,
       listening: true,
@@ -85,6 +150,14 @@ class VoiceInputController extends ChangeNotifier {
     _pushStartInProgress = false;
     if (_disposed || session != _session || _pushFinishRequested) {
       _log('push start canceled before native listen session=$session');
+      if (!_disposed && session == _session) {
+        state = state.copyWith(
+          mode: VoiceInputMode.idle,
+          listening: false,
+          message: 'Escuta manual encerrada.',
+        );
+        notifyListeners();
+      }
       await startPassive();
       return;
     }
@@ -104,6 +177,7 @@ class VoiceInputController extends ChangeNotifier {
     _log('push finish requested session=$session');
     final text = await _speech.stopAndGetText();
     await _completePushToTalk(session, text);
+    _record(DebugEventCodes.pushToTalkFinished, 'Push-to-talk finalizado.', operationId: 'voice-$session');
     await startPassive();
   }
 
@@ -118,6 +192,8 @@ class VoiceInputController extends ChangeNotifier {
   Future<void> _runPassiveLoop(int session) async {
     while (!_disposed &&
         _passiveRequested &&
+        _passiveEnabled &&
+        _screenActive &&
         session == _session &&
         !state.pushToTalkActive) {
       state = state.copyWith(
@@ -132,12 +208,13 @@ class VoiceInputController extends ChangeNotifier {
         final text = await _speech.listenOnce(
           onText: (partial) => _setPassiveTranscription(partial, session),
         );
-        if (!_passiveRequested || session != _session) {
+        if (!_passiveRequested || !_passiveEnabled || !_screenActive || session != _session) {
           return;
         }
         await _processRecognizedText(text, requireWakeWord: true);
-      } catch (_) {
-        if (!_disposed && _passiveRequested && session == _session) {
+      } catch (error) {
+        _record(DebugEventCodes.speechError, 'Falha na escuta passiva: ${error.runtimeType}: $error', severity: DebugSeverity.error, operationId: 'voice-$session');
+        if (!_disposed && _passiveRequested && _passiveEnabled && _screenActive && session == _session) {
           state = state.copyWith(
             listening: false,
             message: 'Reconhecimento de voz indisponivel.',
@@ -169,7 +246,11 @@ class VoiceInputController extends ChangeNotifier {
         await startPassive();
       }
       return text;
-    } catch (_) {
+    } catch (error) {
+      _record(DebugEventCodes.speechError,
+          'Falha no push-to-talk: ${error.runtimeType}: $error',
+          severity: DebugSeverity.error,
+          operationId: 'voice-$session');
       if (!_disposed && session == _session) {
         state = state.copyWith(
           mode: VoiceInputMode.idle,
@@ -209,6 +290,7 @@ class VoiceInputController extends ChangeNotifier {
     notifyListeners();
     if (_wakeFeedbackSession != session) {
       _wakeFeedbackSession = session;
+      _record(DebugEventCodes.wakeWord, 'Wake word reconhecida.', operationId: 'voice-$session');
       _feedback.hapticOnly();
     }
   }
@@ -221,6 +303,8 @@ class VoiceInputController extends ChangeNotifier {
     final command = _parser.parse(text, requireWakeWord: requireWakeWord);
     if (command == null) {
       _log('parse rejected text="$text" requireWakeWord=$requireWakeWord');
+      _record(DebugEventCodes.parserRejected, 'Texto rejeitado pelo parser.',
+          severity: DebugSeverity.warning);
       state = state.copyWith(
         mode: VoiceInputMode.idle,
         listening: false,
@@ -237,6 +321,8 @@ class VoiceInputController extends ChangeNotifier {
       return;
     }
     _log('parse accepted action=${command.action.name}');
+    _record(DebugEventCodes.parserAccepted, 'Comando aceito: ${command.action.name}.');
+    final actionSession = _session;
     state = state.copyWith(
       mode: VoiceInputMode.executing,
       listening: false,
@@ -245,7 +331,19 @@ class VoiceInputController extends ChangeNotifier {
       message: 'Executando comando.',
     );
     notifyListeners();
-    await _onCommand(command.action);
+    _record(DebugEventCodes.actionStarted, 'Execução iniciada: ${command.action.name}.', operationId: 'voice-$actionSession');
+    try {
+      await _onCommand(command.action);
+    } catch (error) {
+      _record(DebugEventCodes.actionFailed, 'Falha ao executar ${command.action.name}: ${error.runtimeType}: $error', severity: DebugSeverity.error, operationId: 'voice-$actionSession');
+      if (!_disposed && actionSession == _session) {
+        state = state.copyWith(mode: VoiceInputMode.idle, listening: false, processing: false, message: 'Falha ao executar comando.');
+        notifyListeners();
+      }
+      return;
+    }
+    _record(DebugEventCodes.actionCompleted, 'Execução concluída: ${command.action.name}.', operationId: 'voice-$actionSession');
+    if (_disposed || actionSession != _session || !_screenActive) return;
     state = state.copyWith(
       mode: VoiceInputMode.idle,
       listening: false,
@@ -256,9 +354,11 @@ class VoiceInputController extends ChangeNotifier {
   }
 
   void _log(String message) {
-    if (kDebugMode) {
-      debugPrint('[ARGUS_VOICE][VoiceInputController] $message');
-    }
+    _record('voice.trace', message);
+  }
+
+  void _record(String code, String message, {DebugSeverity severity = DebugSeverity.info, String? operationId}) {
+    _debugLog?.record(category: 'voice', code: code, message: message, severity: severity, operationId: operationId);
   }
 
   @override

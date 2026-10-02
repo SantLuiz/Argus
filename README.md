@@ -10,6 +10,8 @@ O objetivo é demonstrar viabilidade experimental. A profundidade não represent
 - [Mapa da codebase e guia para outras IAs](docs/CODEBASE.md).
 - [API, modelos e configuração do backend](docs/README_TECNICO.md).
 - [Voz, controles e acessibilidade](docs/11_VOZ_ACESSIBILIDADE_MOBILE.md).
+- [Diagnóstico no próprio aplicativo](docs/DEBUG_MOBILE.md).
+- [Experimento de visão local](docs/VISAO_LOCAL.md).
 - [Docker e acesso remoto](docs/DEPLOYMENT.md).
 - [Pendências e limites da validação](docs/PENDENCIAS.md).
 - [Índice completo da documentação](docs/README.md).

@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../services/argus_api_service.dart';
+import '../services/debug_log_service.dart';
 import '../services/feedback_service.dart';
 import '../services/settings_service.dart';
+import '../models/debug_event.dart';
+import '../widgets/debug_history.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
     required this.settingsService,
     required this.feedback,
+    required this.debugLog,
   });
 
   final SettingsService settingsService;
   final FeedbackService feedback;
+  final DebugLogService debugLog;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -25,6 +30,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _readyTimeoutController;
   late final TextEditingController _detectTimeoutController;
   late bool _showTranscription;
+  late bool _debugEnabled;
+  late bool _passiveListeningEnabled;
   String _status = 'Informe o backend usado pelo prototipo ARGUS.';
 
   @override
@@ -40,6 +47,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _detectTimeoutController =
         TextEditingController(text: settings.detectTimeoutSeconds.toString());
     _showTranscription = settings.showTranscription;
+    _debugEnabled = settings.debugEnabled;
+    _passiveListeningEnabled = settings.passiveListeningEnabled;
   }
 
   @override
@@ -51,33 +60,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _save({bool announce = true}) async {
+  Future<bool> _save({bool announce = true}) async {
     final settings = _readSettings();
     if (settings == null) {
-      return;
+      return false;
     }
-    await widget.settingsService.save(settings);
+    await widget.settingsService.update((current) => current.copyWith(
+          scheme: settings.scheme,
+          host: settings.host,
+          port: settings.port,
+          clearPort: settings.port == null,
+          readyTimeoutSeconds: settings.readyTimeoutSeconds,
+          detectTimeoutSeconds: settings.detectTimeoutSeconds,
+        ));
     if (!mounted) {
-      return;
+      return true;
     }
     setState(() => _status = 'Configuracoes salvas.');
     if (announce) {
       await widget.feedback.action('Configuracoes salvas.', interrupt: true);
     }
+    return true;
   }
 
   Future<void> _testConnection() async {
-    await _save(announce: false);
+    if (!await _save(announce: false)) return;
+    if (!mounted) return;
+    if (!widget.settingsService.settings.hasBackend) {
+      const message = 'Informe o host do backend antes de testar a conexão.';
+      setState(() => _status = message);
+      await widget.feedback.action(message, interrupt: true);
+      return;
+    }
     final service =
-        ArgusApiService(config: widget.settingsService.settings.config);
+        ArgusApiService(config: widget.settingsService.settings.config, debugLog: widget.debugLog);
     setState(() => _status = 'Testando conexao com o backend.');
-    final ready = await service.ready();
+    bool ready;
+    try {
+      ready = await service.ready();
+    } catch (error) {
+      widget.debugLog.record(category: 'settings', code: DebugEventCodes.connectionFailed, message: 'Teste de conexão falhou: ${error.runtimeType}: $error', severity: DebugSeverity.error);
+      if (!mounted) return;
+      const message = 'Nao foi possivel conectar ao backend.';
+      setState(() => _status = message);
+      await widget.feedback.action(message, interrupt: true);
+      return;
+    }
     if (!mounted) {
       return;
     }
     final message = ready
-        ? 'Backend conectado e pronto.'
-        : 'Backend configurado, mas ainda nao esta pronto.';
+        ? 'O backend respondeu e esta disponivel para requisicoes.'
+        : 'O backend respondeu, mas informou indisponibilidade.';
     setState(() => _status = message);
     await widget.feedback.action(message, interrupt: true);
   }
@@ -109,14 +143,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return null;
     }
 
-    return ArgusSettings(
-      scheme: _scheme,
-      host: host,
-      port: port,
-      readyTimeoutSeconds: readyTimeout,
-      detectTimeoutSeconds: detectTimeout,
-      showTranscription: _showTranscription,
+    return widget.settingsService.settings.copyWith(
+      scheme: _scheme, host: host, port: port, clearPort: port == null,
+      readyTimeoutSeconds: readyTimeout, detectTimeoutSeconds: detectTimeout,
     );
+  }
+
+  Future<void> _setDebugEnabled(bool value) async {
+    setState(() => _debugEnabled = value);
+    await widget.settingsService.setDebugEnabled(value);
+    widget.debugLog.setEnabled(value);
+    if (!mounted) return;
+    setState(() => _status = value ? 'Debug ativado.' : 'Debug desativado e histórico apagado.');
+    await widget.feedback.action(_status, interrupt: true);
+  }
+
+  Future<void> _setPassiveListeningEnabled(bool value) async {
+    setState(() => _passiveListeningEnabled = value);
+    await widget.settingsService.setPassiveListeningEnabled(value);
+    widget.debugLog.record(category: 'settings', code: DebugEventCodes.settingChanged,
+        message: value ? 'Escuta passiva ativada.' : 'Escuta passiva desativada.');
+    if (!mounted) return;
+    setState(() => _status = value ? 'Escuta passiva ativada.' : 'Escuta passiva desativada.');
+    await widget.feedback.action(_status, interrupt: true);
   }
 
   Future<void> _setShowTranscription(bool value) async {
@@ -210,9 +259,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Quando desligado, os comandos continuam funcionando por audio.',
               ),
             ),
+            SwitchListTile(
+              value: _passiveListeningEnabled,
+              onChanged: _setPassiveListeningEnabled,
+              title: const Text('Ativar escuta passiva — Argus'),
+              subtitle: const Text('O botão de falar continua disponível. A escuta passiva opera na tela da câmera.'),
+            ),
+            SwitchListTile(
+              value: _debugEnabled,
+              onChanged: _setDebugEnabled,
+              title: const Text('Mostrar debug na tela'),
+              subtitle: const Text('Ao desligar, o histórico desta sessão será apagado.'),
+            ),
+            if (_debugEnabled) ...[
+              const SizedBox(height: 8),
+              Text('Histórico de debug', style: Theme.of(context).textTheme.titleMedium),
+              AnimatedBuilder(
+                animation: widget.debugLog,
+                builder: (context, _) => DebugHistory(events: widget.debugLog.events),
+              ),
+            ],
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _save,
+              onPressed: () async => _save(),
               icon: const Icon(Icons.save),
               label: const Text('Salvar configuracoes'),
             ),

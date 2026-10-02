@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'screens/camera_screen.dart';
 import 'services/feedback_service.dart';
+import 'services/debug_log_service.dart';
 import 'services/settings_service.dart';
 import 'services/tts_service.dart';
 
@@ -9,16 +10,19 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final settingsService = SettingsService();
   await settingsService.load();
-  final tts = TtsService();
+  final debugLog = DebugLogService();
+  debugLog.setEnabled(settingsService.settings.debugEnabled);
+  final tts = TtsService(debugLog: debugLog);
   await tts.configure();
-  runApp(ArgusApp(settingsService: settingsService, tts: tts));
+  runApp(ArgusApp(settingsService: settingsService, tts: tts, debugLog: debugLog));
 }
 
 class ArgusApp extends StatelessWidget {
-  const ArgusApp({super.key, required this.settingsService, required this.tts});
+  const ArgusApp({super.key, required this.settingsService, required this.tts, required this.debugLog});
 
   final SettingsService settingsService;
   final TtsService tts;
+  final DebugLogService debugLog;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +58,7 @@ class ArgusApp extends StatelessWidget {
         settingsService: settingsService,
         tts: tts,
         feedback: FeedbackService(tts: tts),
+        debugLog: debugLog,
       ),
     );
   }

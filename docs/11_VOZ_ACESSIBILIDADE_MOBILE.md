@@ -1,12 +1,12 @@
 # Voz e acessibilidade no aplicativo
 
-**Estado:** implementação presente, mas comandos continuam falhando no Redmi Note 10. A investigação foi adiada; consulte [V01](PENDENCIAS.md). Esta página descreve o comportamento previsto no código, não uma validação bem-sucedida no aparelho.
+**Estado:** implementação presente, mas comandos continuam falhando no Redmi Note 10. A investigação foi adiada; consulte [V01](PENDENCIAS.md). O log no próprio app e o controle separado do Modo A apoiam o próximo diagnóstico, sem representar uma correção. Esta página descreve o comportamento previsto no código, não uma validação bem-sucedida no aparelho.
 
 ## Fluxo de voz
 
 ```mermaid
 flowchart TD
-    A[App visível: sessões passivas] --> B{Texto começa com Argus?}
+    A[Modo A ligado e câmera visível: sessões passivas] --> B{Texto começa com Argus?}
     B -->|Não| A
     B -->|Sim| C[Feedback tátil e texto do comando]
     P[Pressionar microfone] --> Q[Cancelar sessão passiva]
@@ -23,17 +23,19 @@ flowchart TD
 
 `VoiceInputController` coordena ambos os modos; `SpeechRecognitionService` encapsula `speech_to_text`; `VoiceCommandParser` normaliza caixa, acentos e pontuação e consulta uma lista fechada. Os modos ainda compartilham o mesmo controlador; não há motor dedicado de hotword.
 
-### Passivo
+### Passivo (Modo A)
 
-Com a tela da câmera ativa, abre sessões curtas em português e exige o prefixo `Argus`. Uma transcrição contendo a palavra de ativação atualiza a caixa e solicita feedback tátil. A execução usa o texto reconhecido ao concluir a sessão.
+O Modo A possui a preferência persistida **Ativar escuta passiva — Argus**, desligada inicialmente. Quando a preferência está ligada e a tela da câmera está ativa, ele abre sessões curtas em português e exige o prefixo `Argus`. Uma transcrição contendo a palavra de ativação atualiza a caixa e solicita feedback tátil. A execução usa o texto reconhecido ao concluir a sessão.
 
 Não é escuta contínua garantida com tela apagada ou aplicativo em segundo plano. O serviço do Android pode encerrar uma sessão por silêncio/timeout. Mudanças de ciclo de vida suspendem a escuta.
+
+Desligar o Modo A invalida a sessão passiva e bloqueia reinícios, inclusive depois de voltar de Configurações ou concluir uma ação. Essa preferência não desabilita o push-to-talk. Se for alterada durante uma captura manual, a captura pode terminar e apenas a retomada passiva fica bloqueada.
 
 ### Manual
 
 O botão no canto inferior direito inicia a captura ao pressionar. Ao soltar, solicita parada e processamento; um resultado final antecipado também pode concluir o comando. Não exige `Argus`, mas aceita esse prefixo opcional. Com ativação semântica, uma ativação inicia e outra encerra.
 
-Se pressionado durante escuta passiva, cancela a sessão passiva. Se uma ação já estiver sendo processada, o início manual é ignorado; não existe fila de comandos. Depois da conclusão, o controlador tenta retomar a escuta passiva. Corridas entre callbacks e ciclo de vida permanecem hipóteses para o diagnóstico pendente.
+Se pressionado durante escuta passiva, cancela a sessão passiva. Se uma ação já estiver sendo processada, o início manual é ignorado; não existe fila de comandos. Depois da conclusão, o controlador tenta retomar a escuta passiva somente se a preferência estiver ligada e a câmera estiver disponível. Corridas entre callbacks e ciclo de vida permanecem hipóteses para o diagnóstico pendente.
 
 ### Dependência de backend
 
@@ -60,6 +62,8 @@ A presença de uma ação no parser não garante que haja escuta ativa em todas 
 
 Existe uma caixa em `widgets/transcription_panel.dart`, exibida no topo da câmera abaixo dos controles superiores. `SettingsService` persiste `showTranscription` na chave `argus.voice.showTranscription`. A câmera propaga a preferência ao controlador; a decisão de exibir fica na UI/estado, sem desativar reconhecimento ou execução.
 
+O Modo A usa a chave `argus.voice.passiveListeningEnabled` e começa desligado quando a chave não existe. O diagnóstico usa `argus.debug.enabled`. As três preferências são independentes. Consulte [DEBUG_MOBILE.md](DEBUG_MOBILE.md) para o histórico em memória e o roteiro comparativo.
+
 ## Controles e validação de acessibilidade
 
 A câmera usa controles sobrepostos: mudo/ajuda no topo esquerdo, configurações no topo direito, modo porta/captura/repetição embaixo e microfone em destaque à direita. O volume também tem integração com os botões físicos Android.
@@ -77,4 +81,4 @@ Esses itens são critérios de validação, ainda não uma certificação. iOS/V
 
 ## Logs para retomar o diagnóstico
 
-Builds debug registram `[ARGUS_VOICE]` com sessão, status, texto, erros e parse aceito/rejeitado. Os logs podem conter fala do usuário: mantenha-os locais e compartilhe somente trechos necessários e revisados. Consulte [histórico](history/12_DIAGNOSTICO_VOZ_REDMI_E_PLANO.md) para evidências anteriores.
+O log de debug do próprio aplicativo registra solicitação de escuta, retorno nativo, sessão, texto, erros, parser e execução. Ele funciona também no build release quando a preferência está ligada, permanece somente em memória e é apagado ao desligar ou encerrar o processo. Os logs podem conter fala do usuário: mantenha-os locais e compartilhe somente trechos necessários e revisados. Consulte [DEBUG_MOBILE.md](DEBUG_MOBILE.md) e o [histórico](history/12_DIAGNOSTICO_VOZ_REDMI_E_PLANO.md).

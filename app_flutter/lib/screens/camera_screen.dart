@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
@@ -5,8 +7,10 @@ import '../controllers/analysis_controller.dart';
 import '../controllers/voice_input_controller.dart';
 import '../models/voice_command.dart';
 import '../models/voice_state.dart';
+import '../models/debug_event.dart';
 import '../services/argus_api_service.dart';
 import '../services/feedback_service.dart';
+import '../services/debug_log_service.dart';
 import '../services/media_volume_service.dart';
 import '../services/settings_service.dart';
 import '../services/speech_recognition_service.dart';
@@ -16,6 +20,7 @@ import '../widgets/accessible_action_button.dart';
 import '../widgets/push_to_talk_button.dart';
 import '../widgets/system_status.dart';
 import '../widgets/transcription_panel.dart';
+import '../widgets/debug_latest_event.dart';
 import 'settings_screen.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -24,11 +29,13 @@ class CameraScreen extends StatefulWidget {
     required this.settingsService,
     required this.tts,
     required this.feedback,
+    required this.debugLog,
   });
 
   final SettingsService settingsService;
   final TtsService tts;
   final FeedbackService feedback;
+  final DebugLogService debugLog;
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -47,15 +54,18 @@ class _CameraScreenState extends State<CameraScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _api = ArgusApiService(config: widget.settingsService.settings.config);
-    _analysis = AnalysisController(api: _api, tts: widget.tts);
+    _api = ArgusApiService(config: widget.settingsService.settings.config, debugLog: widget.debugLog);
+    _analysis = AnalysisController(api: _api, tts: widget.tts, debugLog: widget.debugLog);
     _voice = VoiceInputController(
-      speech: SpeechRecognitionService(),
+      speech: SpeechRecognitionService(debugLog: widget.debugLog),
       feedback: widget.feedback,
       onCommand: _executeVoiceAction,
+      debugLog: widget.debugLog,
     );
     _voice.updateTranscriptionPreference(
         widget.settingsService.settings.showTranscription);
+    unawaited(_voice.setPassiveEnabled(
+        widget.settingsService.settings.passiveListeningEnabled));
     widget.settingsService.addListener(_onSettingsChanged);
     SystemUiService.enterCameraMode();
     _startCamera();
@@ -68,6 +78,9 @@ class _CameraScreenState extends State<CameraScreen>
     _api.config = widget.settingsService.settings.config;
     _voice.updateTranscriptionPreference(
         widget.settingsService.settings.showTranscription);
+    widget.debugLog.setEnabled(widget.settingsService.settings.debugEnabled);
+    unawaited(_voice.setPassiveEnabled(
+        widget.settingsService.settings.passiveListeningEnabled));
   }
 
   @override
@@ -75,17 +88,20 @@ class _CameraScreenState extends State<CameraScreen>
     final camera = _camera;
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      _voice.suspendPassive(message: 'Escuta pausada.');
+      widget.debugLog.record(category: 'camera', code: DebugEventCodes.appLifecycle, message: 'Aplicativo suspenso: ${state.name}.');
+      unawaited(_voice.setScreenActive(false));
       camera?.dispose();
       _camera = null;
     } else if (state == AppLifecycleState.resumed) {
+      widget.debugLog.record(category: 'camera', code: DebugEventCodes.appLifecycle, message: 'Aplicativo retomado.');
       _startCamera();
       SystemUiService.enterCameraMode();
-      _voice.startPassive();
+      unawaited(_voice.setScreenActive(true));
     }
   }
 
   Future<void> _startCamera() async {
+    widget.debugLog.record(category: 'camera', code: DebugEventCodes.cameraInitializing, message: 'Inicialização da câmera iniciada.');
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -110,8 +126,10 @@ class _CameraScreenState extends State<CameraScreen>
         _camera = controller;
         _cameraError = null;
       });
+      widget.debugLog.record(category: 'camera', code: DebugEventCodes.cameraReady, message: 'Câmera pronta.');
       await widget.feedback.action('Camera pronta.');
-    } catch (_) {
+    } catch (error) {
+      widget.debugLog.record(category: 'camera', code: DebugEventCodes.cameraFailed, message: '${error.runtimeType}: $error', severity: DebugSeverity.error);
       if (!mounted) {
         return;
       }
@@ -134,7 +152,8 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   Future<void> _openSettings() async {
-    await _voice.suspendPassive(message: 'Configuracoes abertas.');
+    widget.debugLog.record(category: 'camera', code: DebugEventCodes.settingsOpened, message: 'Configurações abertas.');
+    await _voice.setScreenActive(false);
     await SystemUiService.exitCameraMode();
     if (!mounted) {
       return;
@@ -144,13 +163,15 @@ class _CameraScreenState extends State<CameraScreen>
         builder: (_) => SettingsScreen(
           settingsService: widget.settingsService,
           feedback: widget.feedback,
+          debugLog: widget.debugLog,
         ),
       ),
     );
     if (mounted) {
       await SystemUiService.enterCameraMode();
       await widget.feedback.action('Voltou para a camera.');
-      await _voice.startPassive();
+      widget.debugLog.record(category: 'camera', code: DebugEventCodes.settingsClosed, message: 'Retorno das configurações.');
+      await _voice.setScreenActive(true);
     }
   }
 
@@ -246,8 +267,8 @@ class _CameraScreenState extends State<CameraScreen>
     return Scaffold(
       extendBody: true,
       body: AnimatedBuilder(
-        animation:
-            Listenable.merge([_analysis, _voice, widget.settingsService]),
+        animation: Listenable.merge(
+            [_analysis, _voice, widget.settingsService, widget.debugLog]),
         builder: (context, _) {
           final camera = _camera;
           final status = widget.tts.hasBrazilianVoice
@@ -264,6 +285,7 @@ class _CameraScreenState extends State<CameraScreen>
                 muted: widget.tts.muted,
                 navigationMode: _analysis.navigationMode,
                 hasCamera: camera != null && camera.value.isInitialized,
+                debugEvent: widget.debugLog.enabled ? widget.debugLog.latest : null,
                 onAnalyze: _analyzeNow,
                 onPushToTalkStart: _voice.beginPushToTalk,
                 onPushToTalkEnd: _voice.finishPushToTalk,
@@ -335,6 +357,7 @@ class _ControlsOverlay extends StatelessWidget {
     required this.muted,
     required this.navigationMode,
     required this.hasCamera,
+    required this.debugEvent,
     required this.onAnalyze,
     required this.onPushToTalkStart,
     required this.onPushToTalkEnd,
@@ -352,6 +375,7 @@ class _ControlsOverlay extends StatelessWidget {
   final bool muted;
   final bool navigationMode;
   final bool hasCamera;
+  final DebugEvent? debugEvent;
   final VoidCallback? onAnalyze;
   final VoidCallback onPushToTalkStart;
   final VoidCallback onPushToTalkEnd;
@@ -413,10 +437,15 @@ class _ControlsOverlay extends StatelessWidget {
             right: 16,
             child: SafeArea(
               minimum: const EdgeInsets.only(top: 88),
-              child: Center(
-                child: voiceState.showTranscription
-                    ? TranscriptionPanel(text: voiceState.transcription)
-                    : const SizedBox.shrink(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (voiceState.showTranscription)
+                    TranscriptionPanel(text: voiceState.transcription),
+                  if (voiceState.showTranscription && debugEvent != null)
+                    const SizedBox(height: 6),
+                  if (debugEvent != null) DebugLatestEvent(event: debugEvent!),
+                ],
               ),
             ),
           ),

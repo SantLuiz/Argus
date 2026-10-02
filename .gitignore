@@ -30,6 +30,7 @@ logs/
 *.pth
 *.onnx
 *.engine
+*.tflite
 *.apk
 *.aab
 *.keystore
@@ -42,6 +43,8 @@ models/*.onnx
 models/**/*.pt
 models/**/*.pth
 models/**/*.onnx
+models/mobile/*.tflite
+app_flutter/assets/mobile_models/*.tflite
 models/torch/
 !models/README.md
 !models/.gitkeep

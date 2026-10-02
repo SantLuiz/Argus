@@ -8,6 +8,8 @@
 | [CODEBASE.md](CODEBASE.md) | Entender arquivos, fluxos e pontos de alteração; leitura inicial para IAs |
 | [README_TECNICO.md](README_TECNICO.md) | Consultar API, perfil MVP e modelos |
 | [11_VOZ_ACESSIBILIDADE_MOBILE.md](11_VOZ_ACESSIBILIDADE_MOBILE.md) | Entender voz, transcrição e validação de acessibilidade |
+| [DEBUG_MOBILE.md](DEBUG_MOBILE.md) | Usar o log em memória e comparar escuta passiva/PPТ no aparelho |
+| [VISAO_LOCAL.md](VISAO_LOCAL.md) | Entender o experimento isolado de detecção contínua no celular |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Rodar o contêiner e acessar o backend remotamente |
 | [PENDENCIAS.md](PENDENCIAS.md) | Conhecer falhas abertas e o que não foi validado |
 | [REORGANIZACAO.md](REORGANIZACAO.md) | Rastrear arquivos removidos ou movidos |

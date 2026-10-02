@@ -16,6 +16,8 @@ Na primeira execução, abra Configurações e informe protocolo, host e porta d
 - [Ambiente e geração do APK](../docs/DEVELOPMENT.md).
 - [Arquivos, responsabilidades e fluxos](../docs/CODEBASE.md).
 - [Voz e acessibilidade](../docs/11_VOZ_ACESSIBILIDADE_MOBILE.md).
+- [Diagnóstico no aplicativo](../docs/DEBUG_MOBILE.md).
+- [Experimento isolado de visão local](../docs/VISAO_LOCAL.md).
 - [Pendências](../docs/PENDENCIAS.md).
 
 O reconhecimento de voz continua com falha reportada no Redmi Note 10. Testes automatizados não comprovam STT ou TalkBack no aparelho. A instalação e o teste do APK ficam com o responsável.

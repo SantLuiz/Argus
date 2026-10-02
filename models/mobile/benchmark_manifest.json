@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": null,
+  "candidates": {
+    "efficientdet_lite0": {
+      "status": "not_prepared",
+      "source": "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/latest/efficientdet_lite0.tflite",
+      "source_project": "Google MediaPipe Models",
+      "license": "Apache-2.0",
+      "format": "TFLite INT8",
+      "sha256": null,
+      "size_bytes": null,
+      "input": null,
+      "outputs": null,
+      "normalization": "uint8 RGB; model quantization metadata is authoritative",
+      "classes": "COCO labels embedded in model metadata",
+      "artifact": "models/mobile/efficientdet_lite0_int8.tflite"
+    },
+    "yolov8n": {
+      "status": "not_prepared",
+      "source": "models/yolo/yolov8n.pt",
+      "source_project": "Ultralytics YOLO",
+      "license": "AGPL-3.0 (verify applicability before distribution)",
+      "format": "TFLite FP32",
+      "export": {
+        "imgsz": 320,
+        "batch": 1,
+        "int8": false,
+        "half": false,
+        "nms": false
+      },
+      "sha256": null,
+      "size_bytes": null,
+      "input": null,
+      "outputs": null,
+      "normalization": "float32 RGB in [0,1], letterboxed to 320x320",
+      "classes": "COCO 80 classes supplied by the local checkpoint",
+      "artifact": "models/mobile/yolov8n_float32_320.tflite"
+    }
+  }
+}

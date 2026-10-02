@@ -1,11 +1,16 @@
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../models/detection_response.dart';
+import '../models/debug_event.dart';
+import 'debug_log_service.dart';
 
 class TtsService {
-  TtsService({FlutterTts? tts}) : _tts = tts ?? FlutterTts();
+  TtsService({FlutterTts? tts, DebugLogService? debugLog})
+      : _tts = tts ?? FlutterTts(),
+        _debugLog = debugLog;
 
   final FlutterTts _tts;
+  final DebugLogService? _debugLog;
   String? _activeText;
   DateTime _lastSpokenAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _muted = false;
@@ -16,11 +21,19 @@ class TtsService {
   bool get hasBrazilianVoice => _hasBrazilianVoice;
 
   Future<void> configure() async {
-    await _tts.awaitSpeakCompletion(true);
-    await _tts.setLanguage('pt-BR');
-    await _tts.setSpeechRate(0.48);
-    await _tts.setVolume(1);
-    _hasBrazilianVoice = await _selectBrazilianVoice();
+    try {
+      await _tts.awaitSpeakCompletion(true);
+      await _tts.setLanguage('pt-BR');
+      await _tts.setSpeechRate(0.48);
+      await _tts.setVolume(1);
+      _hasBrazilianVoice = await _selectBrazilianVoice();
+      _record(DebugEventCodes.ttsConfigured,
+          _hasBrazilianVoice ? 'TTS configurado com voz pt-BR.' : 'TTS configurado sem voz pt-BR disponível.',
+          severity: _hasBrazilianVoice ? DebugSeverity.info : DebugSeverity.warning);
+    } catch (error) {
+      _record(DebugEventCodes.ttsFailed, 'Falha ao configurar TTS: ${error.runtimeType}: $error', severity: DebugSeverity.error);
+      rethrow;
+    }
   }
 
   Future<void> setMuted(bool value) async {
@@ -58,7 +71,7 @@ class TtsService {
     }
     _activeText = text;
     _lastSpokenAt = now;
-    await _tts.speak(text);
+    await _speak(text);
   }
 
   Future<void> speakText(
@@ -75,10 +88,28 @@ class TtsService {
     }
     _activeText = trimmed;
     _lastSpokenAt = DateTime.now();
-    await _tts.speak(trimmed);
+    await _speak(trimmed);
   }
 
-  Future<void> stop() => _tts.stop();
+  Future<void> stop() async {
+    await _tts.stop();
+    _record(DebugEventCodes.ttsStopped, 'Fala interrompida.');
+  }
+
+  Future<void> _speak(String text) async {
+    _record(DebugEventCodes.ttsSpeakRequested, 'Fala solicitada (${text.length} caracteres).');
+    try {
+      await _tts.speak(text);
+      _record(DebugEventCodes.ttsSpeakCompleted, 'Fala concluída.');
+    } catch (error) {
+      _record(DebugEventCodes.ttsFailed, 'Falha na fala: ${error.runtimeType}: $error', severity: DebugSeverity.error);
+      rethrow;
+    }
+  }
+
+  void _record(String code, String message, {DebugSeverity severity = DebugSeverity.info}) {
+    _debugLog?.record(category: 'tts', code: code, message: message, severity: severity);
+  }
 
   Future<bool> _selectBrazilianVoice() async {
     try {
